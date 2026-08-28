@@ -1,0 +1,6 @@
+{
+  "name": "scl-dashboard-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend minimo (Vercel Serverless + Upstash Redis via API REST) para persistir os dados do Dashboard SCL Perdas."
+}
