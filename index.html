@@ -349,6 +349,7 @@ const PRICE_INDEX = {
 };
 
 let selectedKpis = new Set(DATA.kpis.map(k=>k.cod));
+let selectedKpisPlanos = new Set(DATA.kpis.map(k=>k.cod)); // filtro de KPI da aba "Planos de Ação"
 let selectedMonthIdx = "all"; // "all" ou index
 let expandedGroups = new Set(); // grupos da árvore (Quebras / Diferença de Estoque) atualmente abertos
 let treeSortMode = 'auto'; // 'auto' | 'perda' | 'az' | 'manual'
@@ -1751,7 +1752,8 @@ function renderRecordsView(type){
   const meta = TAB_META[type];
   const container = document.getElementById(type==='planos' ? 'viewPlanos' : type==='anomalias' ? 'viewAnomalias' : 'viewDtos');
   const hasDates = records[type].some(r=>r.dataCriacao || r.dataConclusao);
-  const rows = sortRecordsForView(type, records[type]);
+  const registrosBase = type==='planos' ? records[type].filter(r=>selectedKpisPlanos.has(r.kpiCod)) : records[type];
+  const rows = sortRecordsForView(type, registrosBase);
 
   container.innerHTML = `
   <section class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
@@ -1774,6 +1776,12 @@ function renderRecordsView(type){
       </div>
     </div>
     <p class="text-xs text-slate-500 mb-4">${meta.subtitle}${hasDates ? ' — clique numa linha pra ver o plano completo' : ''}</p>
+
+    ${type==='planos' ? `
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+      <div class="flex flex-wrap gap-2" id="kpiFilterChipsPlanos"></div>
+      <button id="limparFiltroKpiPlanosBtn" class="text-[11px] text-slate-400 hover:text-slate-200 underline whitespace-nowrap">Limpar seleção</button>
+    </div>` : ''}
 
     <div id="recordFormArea-${type}"></div>
 
@@ -1807,6 +1815,28 @@ function renderRecordsView(type){
 
   const sortSel = document.getElementById(`recordSortSelect-${type}`);
   if(sortSel) sortSel.addEventListener('change', (e)=>{ recordSort[type] = e.target.value; renderRecordsView(type); });
+
+  if(type==='planos'){
+    const chipsContainer = document.getElementById('kpiFilterChipsPlanos');
+    const kpisComPlano = DATA.kpis.filter(k=>records.planos.some(r=>r.kpiCod===k.cod));
+    chipsContainer.innerHTML = kpisComPlano.map(k=>{
+      const active = selectedKpisPlanos.has(k.cod);
+      return `<button data-cod-planos="${k.cod}" class="chip-planos-btn text-[11px] font-medium px-3 py-1.5 rounded-full border transition ${active ? 'text-slate-900 shadow' : 'bg-[#0b1220] text-slate-400 border-slate-700 hover:border-slate-500'}"
+        style="${active ? `background:${k.cor};border-color:${k.cor}` : ''}">${k.nome}</button>`;
+    }).join('');
+    chipsContainer.querySelectorAll('.chip-planos-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cod = parseInt(btn.dataset.codPlanos);
+        if(selectedKpisPlanos.has(cod)) selectedKpisPlanos.delete(cod); else selectedKpisPlanos.add(cod);
+        if(selectedKpisPlanos.size===0) selectedKpisPlanos.add(cod);
+        renderRecordsView('planos');
+      });
+    });
+    document.getElementById('limparFiltroKpiPlanosBtn').addEventListener('click', ()=>{
+      selectedKpisPlanos = new Set(DATA.kpis.map(k=>k.cod));
+      renderRecordsView('planos');
+    });
+  }
 
   document.getElementById(`newRecordBtn-${type}`).addEventListener('click', ()=>{
     recordFormOpen[type] = true;
