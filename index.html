@@ -228,6 +228,20 @@
         </button>
       </div>
     </div>
+
+    <div class="border-t border-white/10 pt-5 mt-5">
+      <h3 class="font-semibold text-slate-200 mb-1">Planos de Ação em lote</h3>
+      <p class="text-slate-400 text-xs mb-3">Suba um Excel com vários planos de uma vez (mesmas colunas do seu sistema: ID, RESPONSÁVEL, PRAZO, DATA DE CRIAÇÃO, DATA DE CONCLUSÃO, STATUS, AÇÃO). Planos com o mesmo código, ou com a mesma descrição + responsável + data de um plano já existente, são ignorados automaticamente.</p>
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="planosLoteKpiSelect" class="bg-white/5 border border-white/10 text-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"></select>
+        <input type="file" id="planosLoteUpload" accept=".xlsx,.xls" class="hidden" />
+        <button id="planosLoteUploadBtn" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 transition text-white text-sm font-medium px-4 py-2 rounded-lg shadow shadow-emerald-900/40">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          Enviar planos em lote
+        </button>
+      </div>
+      <div id="planosLoteStatus" class="text-xs mt-3"></div>
+    </div>
   </div>
 </div>
 
@@ -1311,6 +1325,12 @@ function populateMonthFilter(){
     selectedMonthIdx = sel.value === "all" ? "all" : parseInt(sel.value);
     renderAll();
   });
+}
+
+function populatePlanosLoteKpiSelect(){
+  const sel = document.getElementById('planosLoteKpiSelect');
+  if(!sel) return;
+  sel.innerHTML = DATA.kpis.map(k=>`<option value="${k.cod}">${k.nome}</option>`).join('');
 }
 
 /* ============ CSV EXPORT ============ */
@@ -2845,8 +2865,127 @@ async function loadJustificativasFromStorage(){
   }catch(e){ return false; }
 }
 
+/* ============================================================
+   PLANOS DE AÇÃO EM LOTE — sobe um Excel com várias linhas de
+   planos de uma vez só, evitando duplicar planos já existentes.
+   ============================================================ */
+const MESES_ABREV = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+
+function normalizarCabecalho(txt){
+  return String(txt||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+}
+
+function dataParaMesAbrev(dataStr){
+  if(!dataStr) return '';
+  const d = new Date(dataStr + 'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  return MESES_ABREV[d.getMonth()];
+}
+
+// um plano é considerado "igual" a outro se tiver o mesmo código,
+// ou a mesma descrição + responsável + data (evita duplicar mesmo sem código)
+function planoDuplicado(candidato, listaExistente){
+  return listaExistente.some(r =>
+    (candidato.id!=null && r.id === candidato.id) ||
+    (r.desc === candidato.desc && r.resp === candidato.resp && r.data === candidato.data && r.kpiCod === candidato.kpiCod)
+  );
+}
+
+async function processarPlanosEmLote(file){
+  const statusEl = document.getElementById('planosLoteStatus');
+  statusEl.className = 'text-xs mt-3 text-slate-400';
+  statusEl.textContent = 'Lendo o arquivo...';
+
+  const kpiCod = parseInt(document.getElementById('planosLoteKpiSelect').value);
+
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, {type:'array', cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const linhas = XLSX.utils.sheet_to_json(ws, {raw:false, dateNF:'yyyy-mm-dd', defval:null});
+
+    if(linhas.length===0){
+      statusEl.className = 'text-xs mt-3 text-amber-400';
+      statusEl.textContent = 'A planilha não tem nenhuma linha de dados.';
+      return;
+    }
+
+    // descobre em quais colunas está cada campo, sem depender de acento/maiúscula
+    const cabecalhos = Object.keys(linhas[0]);
+    const acharColuna = (...alvos) => cabecalhos.find(c => alvos.includes(normalizarCabecalho(c)));
+    const colId = acharColuna('ID');
+    const colResp = acharColuna('RESPONSAVEL');
+    const colPrazo = acharColuna('PRAZO');
+    const colCriacao = acharColuna('DATA DE CRIACAO');
+    const colConclusao = acharColuna('DATA DE CONCLUSAO');
+    const colStatus = acharColuna('STATUS');
+    const colAcao = acharColuna('ACAO');
+
+    if(!colAcao){
+      statusEl.className = 'text-xs mt-3 text-red-400';
+      statusEl.textContent = 'Não encontrei a coluna "AÇÃO" na planilha — confira se é o mesmo modelo usado antes.';
+      return;
+    }
+
+    let adicionados = 0, duplicados = 0, semDescricao = 0;
+    const novosNoLote = [];
+
+    for(const linha of linhas){
+      const desc = (linha[colAcao]||'').toString().trim();
+      if(!desc){ semDescricao++; continue; }
+
+      const idBruto = colId ? parseInt(linha[colId]) : NaN;
+      const candidato = {
+        id: !isNaN(idBruto) ? idBruto : (nextRecordId++),
+        kpiCod,
+        desc,
+        resp: colResp ? (linha[colResp]||'').toString().trim() : '',
+        data: colPrazo ? (linha[colPrazo]||'') : '',
+        dataCriacao: colCriacao ? (linha[colCriacao]||null) : null,
+        dataConclusao: colConclusao ? (linha[colConclusao]||null) : null,
+        status: colStatus ? (linha[colStatus]||'').toString().trim() || 'Pendente' : 'Pendente',
+        img: null, evidenciaSugerida: false, comentario: ''
+      };
+      candidato.mes = dataParaMesAbrev(candidato.data) || dataParaMesAbrev(candidato.dataCriacao) || '';
+
+      if(planoDuplicado(candidato, records.planos) || planoDuplicado(candidato, novosNoLote)){
+        duplicados++;
+        continue;
+      }
+      novosNoLote.push(candidato);
+      adicionados++;
+    }
+
+    for(const rec of novosNoLote){
+      records.planos.push(rec);
+      await addRecordToStorage('planos', rec);
+    }
+
+    renderRecordsView('planos');
+    renderTabBar();
+
+    statusEl.className = 'text-xs mt-3 text-emerald-400';
+    statusEl.textContent = `Pronto! ${adicionados} plano(s) adicionado(s), ${duplicados} duplicado(s) ignorado(s)${semDescricao ? `, ${semDescricao} linha(s) sem descrição ignorada(s)` : ''}.`;
+  }catch(err){
+    console.error(err);
+    statusEl.className = 'text-xs mt-3 text-red-400';
+    statusEl.textContent = 'Não consegui ler esse arquivo. Confira se é um .xlsx válido.';
+  }
+}
+
+document.getElementById('planosLoteUploadBtn').addEventListener('click', ()=>{
+  document.getElementById('planosLoteUpload').click();
+});
+document.getElementById('planosLoteUpload').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  await processarPlanosEmLote(file);
+  e.target.value = '';
+});
+
 (async function init(){
   populateMonthFilter();
+  populatePlanosLoteKpiSelect();
   const [dataRestored, recordsRestored, justRestored] = await Promise.all([loadDataFromStorage(), loadRecordsFromStorage(), loadJustificativasFromStorage()]);
   await loadLastFileMetaFromStorage();
   await loadTreeSortFromStorage();
