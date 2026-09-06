@@ -241,6 +241,20 @@
   <img id="imageModalImg" src="" class="max-w-full max-h-full rounded-lg shadow-2xl" />
 </div>
 
+<!-- ==================== MODAL DE CONFIRMAÇÃO DE EXCLUSÃO ==================== -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
+  <div class="bg-slate-900 border border-white/10 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+    <h3 class="text-white font-bold text-lg mb-2">Confirmar exclusão</h3>
+    <p class="text-slate-300 text-sm mb-4">Você realmente deseja excluir este dado? Se sim, informe a palavra-chave abaixo.</p>
+    <input id="deleteConfirmInput" type="password" autocomplete="off" placeholder="Palavra-chave" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm mb-2 outline-none focus:ring-2 focus:ring-red-500" />
+    <p id="deleteConfirmError" class="text-red-400 text-xs mb-3 hidden">Palavra-chave incorreta. Nada foi excluído.</p>
+    <div class="flex justify-end gap-2 mt-1">
+      <button id="deleteConfirmCancelBtn" class="px-4 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/10 transition">Cancelar</button>
+      <button id="deleteConfirmOkBtn" class="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white font-semibold transition">Excluir</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ============ DADOS EXTRAÍDOS DA PLANILHA ============ */
 const DATA = {
@@ -1817,14 +1831,16 @@ function renderRecordsView(type){
   });
 
   container.querySelectorAll('[data-del-record]').forEach(btn=>{
-    btn.addEventListener('click', async (e)=>{
+    btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       const id = parseInt(btn.dataset.delRecord);
       const t = btn.dataset.delType;
-      records[t] = records[t].filter(r=>r.id!==id);
-      renderRecordsView(t);
-      renderTabBar();
-      await deleteRecordFromStorage(t, id);
+      pedirConfirmacaoExclusao(async ()=>{
+        records[t] = records[t].filter(r=>r.id!==id);
+        renderRecordsView(t);
+        renderTabBar();
+        await deleteRecordFromStorage(t, id);
+      });
     });
   });
 
@@ -2065,13 +2081,15 @@ function renderGapaView(){
   });
 
   container.querySelectorAll('[data-del-gapa]').forEach(btn=>{
-    btn.addEventListener('click', async (e)=>{
+    btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       const id = parseInt(btn.dataset.delGapa);
-      records.gapa = records.gapa.filter(r=>r.id!==id);
-      renderGapaView();
-      renderTabBar();
-      await deleteRecordFromStorage('gapa', id);
+      pedirConfirmacaoExclusao(async ()=>{
+        records.gapa = records.gapa.filter(r=>r.id!==id);
+        renderGapaView();
+        renderTabBar();
+        await deleteRecordFromStorage('gapa', id);
+      });
     });
   });
 }
@@ -2265,6 +2283,49 @@ function closeImageModal(e){
   modal.classList.add('hidden');
   modal.classList.remove('flex');
 }
+
+/* ============================================================
+   CONFIRMAÇÃO DE EXCLUSÃO — pede a palavra-chave "ABACAXI"
+   antes de excluir qualquer plano/anomalia/DTO/GAPA, pra evitar
+   exclusões acidentais.
+   ============================================================ */
+const PALAVRA_CHAVE_EXCLUSAO = 'ABACAXI';
+let acaoExclusaoPendente = null;
+
+function pedirConfirmacaoExclusao(acao){
+  acaoExclusaoPendente = acao;
+  const input = document.getElementById('deleteConfirmInput');
+  input.value = '';
+  document.getElementById('deleteConfirmError').classList.add('hidden');
+  const modal = document.getElementById('deleteConfirmModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  setTimeout(()=>input.focus(), 50);
+}
+
+function fecharConfirmacaoExclusao(){
+  const modal = document.getElementById('deleteConfirmModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  acaoExclusaoPendente = null;
+}
+
+async function confirmarExclusaoComPalavraChave(){
+  const valor = document.getElementById('deleteConfirmInput').value.trim();
+  if(valor !== PALAVRA_CHAVE_EXCLUSAO){
+    document.getElementById('deleteConfirmError').classList.remove('hidden');
+    return;
+  }
+  const acao = acaoExclusaoPendente;
+  fecharConfirmacaoExclusao();
+  if(acao) await acao();
+}
+
+document.getElementById('deleteConfirmCancelBtn').addEventListener('click', fecharConfirmacaoExclusao);
+document.getElementById('deleteConfirmOkBtn').addEventListener('click', confirmarExclusaoComPalavraChave);
+document.getElementById('deleteConfirmInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') confirmarExclusaoComPalavraChave();
+});
 
 /* ============================================================
    UPLOAD DE PLANILHA (.xlsx) — lê o arquivo no navegador e
