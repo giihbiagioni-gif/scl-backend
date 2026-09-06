@@ -113,6 +113,14 @@
     </div>
   </section>
 
+  <!-- ==================== TOGGLE PREÇO DE MERCADO ==================== -->
+  <div class="flex items-center justify-end -mb-2">
+    <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+      <input type="checkbox" id="togglePrecoMercado" checked class="w-3.5 h-3.5 rounded accent-amber-400 cursor-pointer" />
+      Mostrar aumento de preço dos produtos nos gráficos
+    </label>
+  </div>
+
   <!-- ==================== CHARTS ROW 1 ==================== -->
   <section class="grid grid-cols-1 xl:grid-cols-3 gap-6">
     <div class="xl:col-span-2 bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
@@ -366,6 +374,7 @@ const PRICE_INDEX = {
 
 let selectedKpis = new Set(DATA.kpis.map(k=>k.cod));
 let selectedKpisPlanos = new Set(DATA.kpis.map(k=>k.cod)); // filtro de KPI da aba "Planos de Ação"
+let mostrarPrecoMercado = true; // controla se a série "Preço Médio de Mercado" aparece nos gráficos
 let selectedMonthIdx = "all"; // "all" ou index
 let expandedGroups = new Set(); // grupos da árvore (Quebras / Diferença de Estoque) atualmente abertos
 let treeSortMode = 'auto'; // 'auto' | 'perda' | 'az' | 'manual'
@@ -1103,13 +1112,13 @@ function renderCharts(){
       {label:'Meta', data:metaByMonth, borderColor:SERIES_COLORS.meta, backgroundColor:SERIES_COLORS.meta+'22', borderDash:[5,4], tension:.35, fill:false, pointRadius:4, yAxisID:'y'},
       {label:'Real 2026', data:realByMonth, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.35, fill:true, pointRadius:4, pointBackgroundColor:SERIES_COLORS.ano2026, yAxisID:'y'},
       {label:'Real 2025', data:real2025ByMonth, borderColor:SERIES_COLORS.ano2025, backgroundColor:SERIES_COLORS.ano2025+'33', borderWidth:2.5, borderDash:[6,3], tension:.35, fill:true, pointRadius:4, pointBackgroundColor:SERIES_COLORS.ano2025, yAxisID:'y'},
-      {label:'Preço Médio Mercado', data:priceIndexByMonth, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2.5, borderDash:[3,2], tension:.35, fill:false, pointRadius:3, pointBackgroundColor:SERIES_COLORS.precoMercado, yAxisID:'y1'}
+      ...(mostrarPrecoMercado ? [{label:'Preço Médio Mercado', data:priceIndexByMonth, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2.5, borderDash:[3,2], tension:.35, fill:false, pointRadius:3, pointBackgroundColor:SERIES_COLORS.precoMercado, yAxisID:'y1'}] : [])
     ]},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.dataset.yAxisID==='y1'?fmtBRLc(ctx.raw):fmtBRLc(ctx.raw))}} },
       scales:{
         y:{ ticks:{callback:v=>fmtBRL(v), color:TICK_COLOR}, grid:{color:GRID_COLOR} },
-        y1:{ position:'right', ticks:{callback:v=>fmtBRLc(v), color:SERIES_COLORS.precoMercado}, grid:{display:false} },
+        y1:{ display:mostrarPrecoMercado, position:'right', ticks:{callback:v=>fmtBRLc(v), color:SERIES_COLORS.precoMercado}, grid:{display:false} },
         x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
   });
 
@@ -1174,13 +1183,13 @@ function renderKpiPerfCharts(kpis, monthsLbl, idxRange){
         {label:'Meta 2026', data:metaData, borderColor:SERIES_COLORS.meta, backgroundColor:SERIES_COLORS.meta+'22', borderDash:[5,4], tension:.3, pointRadius:3, fill:false, yAxisID:'y'},
         {label:'Real 2026', data:real2026Data, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:3, fill:true, yAxisID:'y'},
         {label:'Real 2025', data:real2025Data, borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false, yAxisID:'y'},
-        {label:'Preço Mercado', data:priceIndexData, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[3,2], tension:.3, pointRadius:2, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'}
+        ...(mostrarPrecoMercado ? [{label:'Preço Mercado', data:priceIndexData, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[3,2], tension:.3, pointRadius:2, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'}] : [])
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:7, font:{size:9}, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtBRLc(ctx.raw)}} },
         scales:{
           y:{ ticks:{callback:v=>fmtBRL(v), color:TICK_COLOR, font:{size:9}}, grid:{color:GRID_COLOR} },
-          y1:{ position:'right', ticks:{callback:v=>fmtBRLc(v), color:SERIES_COLORS.precoMercado, font:{size:8}}, grid:{display:false} },
+          y1:{ display:mostrarPrecoMercado, position:'right', ticks:{callback:v=>fmtBRLc(v), color:SERIES_COLORS.precoMercado, font:{size:8}}, grid:{display:false} },
           x:{ticks:{color:TICK_COLOR, font:{size:9}}, grid:{display:false}} } }
     });
   });
@@ -3084,6 +3093,10 @@ document.getElementById('planosLoteUpload').addEventListener('change', async (e)
 (async function init(){
   populateMonthFilter();
   populatePlanosLoteKpiSelect();
+  document.getElementById('togglePrecoMercado').addEventListener('change', (e)=>{
+    mostrarPrecoMercado = e.target.checked;
+    renderCharts();
+  });
   const [dataRestored, recordsRestored, justRestored] = await Promise.all([loadDataFromStorage(), loadRecordsFromStorage(), loadJustificativasFromStorage()]);
   await loadLastFileMetaFromStorage();
   await loadTreeSortFromStorage();
