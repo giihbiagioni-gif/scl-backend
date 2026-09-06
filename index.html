@@ -681,15 +681,15 @@ function renderTree(){
 
   // painel de detalhamento — R$ e FGLI empilhados (um em cima do outro), cada um abrindo
   // seus valores de META/REAL lado a lado para a direita
-  // Quebra AG, Refugo Fábrica e Diferença de Estoque não têm ramo de FGLI (sem dado real de FGLI pra eles)
-  const NO_FGLI_CODES = [22010, 22201, 22006, 22008, 22016];
+  // Quebra AG, Refugo Fábrica e Erro Prog. Puxada não têm ramo de FGLI (sem dado real de FGLI pra eles)
+  const NO_FGLI_CODES = [22010, 22201, 22008, 22016];
   // pra objetos "virtuais" de grupo, decide se tem FGLI pelos dados combinados, não pelo código
   function hasFgliData(k){
     if(k.isGroup) return (k.fgli_meta_mensal||[]).some(v=>v!=null) || (k.fgli_real_mensal||[]).some(v=>v!=null);
     return !NO_FGLI_CODES.includes(k.cod);
   }
   function detailPanel(k){
-    const hasWqi = k.wqi_meta_mensal != null;
+    const hasWqi = k.wqi_meta_mensal != null && (k.isGroup || k.cod===22007);
     const hasFgli = hasFgliData(k);
     return `
     <div class="flex flex-col gap-1.5 fade-in">
@@ -703,7 +703,8 @@ function renderTree(){
   function detailToggle(k){
     const open = expandedDetail.has(k.cod);
     const hasFgli = hasFgliData(k);
-    const label = k.wqi_meta_mensal != null ? 'Detalhar R$ / FGLI / WQI' : (hasFgli ? 'Detalhar R$ / FGLI' : 'Detalhar R$');
+    const hasWqi = k.wqi_meta_mensal != null && (k.isGroup || k.cod===22007);
+    const label = hasWqi ? 'Detalhar R$ / FGLI / WQI' : (hasFgli ? 'Detalhar R$ / FGLI' : 'Detalhar R$');
     return `
     <button data-detail="${k.cod}" class="mt-1.5 w-full flex items-center justify-between text-[9px] font-semibold ${open?'text-blue-400':'text-slate-500 hover:text-slate-300'} transition pt-1.5 border-t border-slate-800">
       <span>${label}</span>
@@ -1465,6 +1466,8 @@ async function handleCsvUpload(e){
       DATA.kpis.forEach(k=>{
         const novo = porCod[k.cod];
         if(!novo) return;
+        // WQI só existe de verdade para Quebra PA (22007) — evita que ele "vaze" pra outros KPIs via CSV
+        if(k.cod !== 22007){ novo.wqi_meta_mensal = Array(8).fill(null); novo.wqi_real_mensal = Array(8).fill(null); }
         Object.assign(k, novo);
         atualizados++;
       });
