@@ -2013,6 +2013,16 @@ function recordDetail(r, type, meta){
           <p class="text-[9px] text-slate-500 font-semibold">RESPONSÁVEL</p>
           <p class="text-xs font-semibold text-slate-200">${r.resp||'—'}</p>
         </div>
+        ${r.colaborador ? `
+        <div class="bg-[#111827] rounded-lg p-2">
+          <p class="text-[9px] text-slate-500 font-semibold">COLABORADOR</p>
+          <p class="text-xs font-semibold text-slate-200">${r.colaborador}</p>
+        </div>` : ''}
+        ${r.planoRef ? `
+        <div class="bg-[#111827] rounded-lg p-2">
+          <p class="text-[9px] text-slate-500 font-semibold">PLANO DE ORIGEM</p>
+          <p class="text-xs font-semibold text-slate-200 font-mono">#${r.planoRef}</p>
+        </div>` : ''}
         <div class="bg-[#111827] rounded-lg p-2">
           <p class="text-[9px] text-slate-500 font-semibold">${meta.dateLabel.toUpperCase()}</p>
           <p class="text-xs font-semibold text-slate-200">${r.data||'—'}</p>
@@ -2639,6 +2649,12 @@ const STORAGE_KEY_PLANOS_QUEBRAS_SEED_FLAG = 'scl-planos-quebras-seed-applied-v1
 const STORAGE_KEY_DTO_EVIDENCE_FLAG = 'scl-dto-evidence-applied-v1';
 const STORAGE_KEY_DTO_COMMENT_FLAG = 'scl-dto-comment-fill-applied-v1';
 const STORAGE_KEY_TREINAMENTO_COMMENT_FLAG = 'scl-treinamento-comment-fill-applied-v1';
+const STORAGE_KEY_SYNC_EVIDENCIAS_FLAG = 'scl-sync-evidencias-dto-treino-v1';
+
+function extrairColaborador(desc){
+  const m = (desc||'').match(/colaborador\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]*?)\s+devido/i);
+  return m ? m[1].trim() : null;
+}
 
 function dataBR(dataStr){
   if(!dataStr) return null;
@@ -3112,6 +3128,46 @@ document.getElementById('planosLoteUpload').addEventListener('change', async (e)
         await storageSet(STORAGE_KEY_TREINAMENTO_COMMENT_FLAG, 'true');
       }
     }catch(e){ console.warn('Não foi possível preencher os comentários de treinamento:', e); }
+  }
+  // replica as evidências já anexadas nos planos de DTO/treinamento como registros nas abas específicas, uma única vez
+  if(hasPersistentStorage){
+    try{
+      const syncApplied = await storageGet(STORAGE_KEY_SYNC_EVIDENCIAS_FLAG);
+      if(!syncApplied){
+        const dtoRefs = new Set(records.dtos.map(r=>r.planoRef).filter(Boolean));
+        const treinoRefs = new Set(records.treinamentos.map(r=>r.planoRef).filter(Boolean));
+        for(const plano of records.planos){
+          if(!plano.img) continue;
+          const descLower = (plano.desc||'').toLowerCase();
+          const ehDto = descLower.includes('dto');
+          const ehTreino = descLower.includes('manuseio manual') || descLower.includes('treinamento');
+          if(!ehDto && !ehTreino) continue;
+          const destino = ehDto ? 'dtos' : 'treinamentos';
+          const refs = ehDto ? dtoRefs : treinoRefs;
+          if(refs.has(plano.id)) continue;
+          const novo = {
+            id: nextRecordId++,
+            kpiCod: plano.kpiCod,
+            mes: plano.mes,
+            desc: plano.desc,
+            resp: plano.resp,
+            colaborador: extrairColaborador(plano.desc),
+            planoRef: plano.id,
+            data: plano.data,
+            dataCriacao: plano.dataCriacao,
+            dataConclusao: plano.dataConclusao,
+            status: 'Concluído',
+            img: plano.img,
+            evidenciaSugerida: false,
+            comentario: plano.comentario || ''
+          };
+          records[destino].push(novo);
+          refs.add(plano.id);
+          await addRecordToStorage(destino, novo);
+        }
+        await storageSet(STORAGE_KEY_SYNC_EVIDENCIAS_FLAG, 'true');
+      }
+    }catch(e){ console.warn('Não foi possível sincronizar evidências com DTOs/Treinamentos:', e); }
   }
   renderLastFileButton();
   renderTabBar();
