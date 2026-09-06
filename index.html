@@ -2638,6 +2638,7 @@ const STORAGE_KEY_GAPA_SEED_FLAG = 'scl-gapa-seed-applied-v1';
 const STORAGE_KEY_PLANOS_QUEBRAS_SEED_FLAG = 'scl-planos-quebras-seed-applied-v1';
 const STORAGE_KEY_DTO_EVIDENCE_FLAG = 'scl-dto-evidence-applied-v1';
 const STORAGE_KEY_DTO_COMMENT_FLAG = 'scl-dto-comment-fill-applied-v1';
+const STORAGE_KEY_TREINAMENTO_COMMENT_FLAG = 'scl-treinamento-comment-fill-applied-v1';
 
 function dataBR(dataStr){
   if(!dataStr) return null;
@@ -3092,6 +3093,25 @@ document.getElementById('planosLoteUpload').addEventListener('change', async (e)
         await storageSet(STORAGE_KEY_DTO_COMMENT_FLAG, 'true');
       }
     }catch(e){ console.warn('Não foi possível preencher os comentários de DTO:', e); }
+  }
+  // preenche automaticamente o comentário dos planos de treinamento (manuseio manual) que já têm evidência anexada, uma única vez
+  if(hasPersistentStorage){
+    try{
+      const treinoCommentApplied = await storageGet(STORAGE_KEY_TREINAMENTO_COMMENT_FLAG);
+      if(!treinoCommentApplied){
+        for(const rec of records.planos){
+          const ehTreinamento = (rec.desc||'').toLowerCase().includes('manuseio manual');
+          if(ehTreinamento && rec.img && (!rec.comentario || !rec.comentario.trim())){
+            const dataConclusaoBR = dataBR(rec.dataConclusao);
+            if(dataConclusaoBR){
+              rec.comentario = `Treinamento realizado com o colaborador no dia ${dataConclusaoBR}`;
+              await addRecordToStorage('planos', rec);
+            }
+          }
+        }
+        await storageSet(STORAGE_KEY_TREINAMENTO_COMMENT_FLAG, 'true');
+      }
+    }catch(e){ console.warn('Não foi possível preencher os comentários de treinamento:', e); }
   }
   renderLastFileButton();
   renderTabBar();
