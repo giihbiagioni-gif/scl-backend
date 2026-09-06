@@ -1828,8 +1828,6 @@ function renderRecordsView(type){
       <button id="limparFiltroKpiPlanosBtn" class="text-[11px] text-slate-400 hover:text-slate-200 underline whitespace-nowrap">Limpar seleção</button>
     </div>` : ''}
 
-    ${['anomalias','dtos','treinamentos'].includes(type) ? renderDocumentosAnexados(type) : ''}
-
     <div id="recordFormArea-${type}"></div>
 
     ${rows.length===0 ? emptyState(meta) : `
