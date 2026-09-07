@@ -2420,6 +2420,9 @@ function renderRecordsView(type){
       if(t==='anomalias'){
         await perguntarSubirPlanosTracados(rec);
       }
+      if(t==='planos'){
+        await sincronizarAnomaliaDoPlano(rec);
+      }
 
       renderRecordsView(t);
       renderTabBar();
@@ -3049,6 +3052,7 @@ function wireRecordForm(type){
       renderRecordsView(type);
       renderTabBar();
       await addRecordToStorage(type, rec);
+      if(type==='planos') await sincronizarAnomaliaDoPlano(rec);
     };
 
     if(file){
@@ -3618,6 +3622,78 @@ function extrairColaborador(desc){
   return m ? m[1].trim() : null;
 }
 
+// ---------- geração automática do Relato de Anomalia a partir de um plano de ação ----------
+const PERFIL_KPI_ANOMALIA = {
+  22007: {area:'Quebra PA', acoesBloqueio:'Segregação dos produtos avariados e comunicação imediata à liderança do turno.', categoria:'Processo', causaPotencial:'Manuseio inadequado durante carregamento/armazenagem'},
+  22006: {area:'Diferença de Estoque PA', acoesBloqueio:'Recontagem física da posição impactada e bloqueio de movimentação até validação.', categoria:'Processo', causaPotencial:'Divergência entre contagem física e sistêmica'},
+  22008: {area:'Diferença de Estoque AG', acoesBloqueio:'Recontagem física dos ativos de giro impactados e checagem do lançamento no sistema.', categoria:'Processo', causaPotencial:'Erro na contagem/lançamento de ativos de giro (garrafa)'},
+  22002: {area:'Reposição', acoesBloqueio:'Verificação da ocorrência com o motorista/equipe responsável e registro fotográfico da avaria.', categoria:'Transporte', causaPotencial:'Avaria ou erro de carregamento durante o transporte'}
+};
+function extrairValorAnomalia(desc){
+  let m = (desc||'').match(/em ([\d.,]+) do dia/); if(m) return m[1];
+  m = (desc||'').match(/valor de -?R\$\s*([\d.,]+)/); if(m) return m[1];
+  m = (desc||'').match(/valor do gatilho \(R\$([\d.,]+)/); if(m) return m[1];
+  return '';
+}
+function extrairDataAnomaliaTexto(desc, fallback){
+  let m = (desc||'').match(/do dia (\d{2}\/\d{2}\/\d{4})/);
+  if(m){ const [d,mo,y] = m[1].split('/'); return `${y}-${mo}-${d}`; }
+  m = (desc||'').match(/do dia (\d{2}\/\d{2})(?!\d)/);
+  if(m && fallback){ const [d,mo] = m[1].split('/'); const ano = fallback.split('-')[0]; return `${ano}-${mo}-${d}`; }
+  return fallback || '';
+}
+
+// se a descrição do plano falar em "relato de anomalia" e ainda não existir um relato ligado a ele, cria automaticamente
+async function sincronizarAnomaliaDoPlano(plano){
+  if(!plano || !(plano.desc||'').toLowerCase().includes('relato de anomalia')) return;
+  if(records.anomalias.some(r=>r.planoRef===plano.id)) return; // já existe, não duplica
+
+  const perfil = PERFIL_KPI_ANOMALIA[plano.kpiCod] || {area:'', acoesBloqueio:'', categoria:'Processo', causaPotencial:''};
+  const valor = extrairValorAnomalia(plano.desc);
+  const dataAnom = extrairDataAnomaliaTexto(plano.desc, plano.dataConclusao || plano.data);
+  const statusFinal = plano.status || 'Pendente';
+
+  const causaRaizAcoes = Array.from({length:7}, ()=>({categoria:'',causaPotencial:'',acao:'',responsavel:'',dataLimite:'',status:'',possivelCausaRaiz:''}));
+  causaRaizAcoes[0] = {
+    categoria: perfil.categoria, causaPotencial: perfil.causaPotencial,
+    acao: 'Investigar aderência ao processo padrão junto à equipe responsável',
+    responsavel: plano.resp || '', dataLimite: plano.data || '', status: statusFinal, possivelCausaRaiz: statusFinal==='Concluído' ? 'Sim' : ''
+  };
+  const planoPrevencao = Array.from({length:8}, ()=>({data:'',topico:'',acao:'',comentarios:'',responsavel:'',dataLimite:'',status:''}));
+  planoPrevencao[0] = {
+    data: plano.data || '', topico: perfil.area, acao: plano.desc || '',
+    comentarios: plano.comentario || '', responsavel: plano.resp || '', dataLimite: plano.data || '', status: statusFinal
+  };
+
+  const kpiRef = DATA.kpis.find(k=>k.cod===plano.kpiCod);
+  const novo = {
+    id: nextRecordId++, kpiCod: plano.kpiCod, mes: plano.mes, desc: plano.desc,
+    resp: plano.resp || '', data: plano.data, dataCriacao: plano.dataCriacao,
+    dataConclusao: plano.dataConclusao, status: statusFinal,
+    img: null, evidenciaSugerida: false, comentario: '',
+    planoRef: plano.id,
+    cdd: 'Atlântica', dataAnomalia: dataAnom, turnoEquipe: '',
+    iniciadoPor: plano.resp || '', responsavelConclusao: plano.resp || '',
+    departamento: 'Logistics', area: perfil.area,
+    gatilhoTexto: (kpiRef && kpiRef.gatilho!=null) ? fmtBRLc(kpiRef.gatilho) : (valor ? `R$ ${valor}` : ''),
+    equipamentoAfetado: '', numeroRegistro: String(plano.id),
+    tempoInatividadeValor: '', tempoInatividadeUnidade: '',
+    perdasValor: valor, perdasUnidade: 'R$',
+    produtosNaoConformesValor: '', produtosNaoConformesUnidade: '',
+    acoesBloqueio: perfil.acoesBloqueio, observacoes: '',
+    outroRelato: 'Não', quemConduzAnalise: plano.resp || '',
+    causaRaizAcoes,
+    chkMapeamentoProcesso: 'Não', chkDto: 'Não', chkPadrao: 'Não',
+    chkTreinamento: 'Não', chkMonitoramentoIv: 'Não',
+    planoPrevencao,
+    resolveuCausaRaiz: statusFinal==='Concluído' ? 'Sim' : '', escalarZona: 'Não', escalarCapex: 'Não', enviouInovacao: 'Não'
+  };
+  records.anomalias.push(novo);
+  await addRecordToStorage('anomalias', novo);
+  if(activeTab==='anomalias') renderRecordsView('anomalias');
+  renderTabBar();
+}
+
 function dataBR(dataStr){
   if(!dataStr) return null;
   const [ano,mes,dia] = dataStr.split('-');
@@ -4054,6 +4130,7 @@ async function processarPlanosEmLote(file){
     for(const rec of novosNoLote){
       records.planos.push(rec);
       await addRecordToStorage('planos', rec);
+      await sincronizarAnomaliaDoPlano(rec);
     }
 
     renderRecordsView('planos');
