@@ -1356,6 +1356,8 @@ function renderCharts(){
 
   const rsHlScl2026 = idxRange.map((_,pos) => volume2026PorMes[pos] ? (perda2026PorMes[pos]/volume2026PorMes[pos]) : null);
   const rsHlScl2025 = idxRange.map((_,pos) => (volume2025PorMes[pos]!=null && volume2025PorMes[pos]!==0) ? (perda2025PorMes[pos]/volume2025PorMes[pos]) : null);
+  const volVarPctPorMes = idxRange.map((_,pos) => (volume2025PorMes[pos]!=null && volume2025PorMes[pos]!==0 && volume2026PorMes[pos]!=null)
+    ? ((volume2026PorMes[pos]-volume2025PorMes[pos])/volume2025PorMes[pos]*100) : null);
   const temRsHlScl2025 = rsHlScl2025.some(v=>v!=null);
 
   const rsHlSclCanvas = document.getElementById('rsHlSclChart');
@@ -1369,12 +1371,16 @@ function renderCharts(){
     charts.rsHlScl = new Chart(rsHlSclCanvas, {
       type:'line',
       data:{ labels: monthsLbl, datasets:[
-        {label:'R$/HL 2026', data:rsHlScl2026, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:4, fill:true, pointBackgroundColor:SERIES_COLORS.ano2026},
-        {label:'R$/HL 2025', data:rsHlScl2025, borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false}
+        {label:'R$/HL 2026', data:rsHlScl2026, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:4, fill:true, pointBackgroundColor:SERIES_COLORS.ano2026, yAxisID:'y'},
+        {label:'R$/HL 2025', data:rsHlScl2025, borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false, yAxisID:'y'},
+        {label:'Volume 25→26 (%)', data:volVarPctPorMes, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[2,2], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'}
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtBRLc(ctx.raw)+'/hL'}} },
-        scales:{ y:{ticks:{callback:v=>fmtBRLc(v), color:TICK_COLOR}, grid:{color:GRID_COLOR}}, x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
+        plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='y1' ? (ctx.dataset.label+': '+fmtPct(ctx.raw)) : (ctx.dataset.label+': '+fmtBRLc(ctx.raw)+'/hL')}} },
+        scales:{
+          y:{ ticks:{callback:v=>fmtBRLc(v), color:TICK_COLOR}, grid:{color:GRID_COLOR} },
+          y1:{ position:'right', ticks:{callback:v=>fmtPct(v), color:SERIES_COLORS.precoMercado}, grid:{display:false} },
+          x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
     });
   }
 }
