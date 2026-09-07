@@ -2503,8 +2503,8 @@ function htmlRelatorioAnomaliaPdf(r, k){
   const pv = r.planoPrevencao || [];
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;width:760px;">
-    <div style="text-align:center;font-size:18px;font-weight:bold;margin-bottom:2px;">Relato de Anomalia</div>
-    <div style="text-align:center;font-size:10px;color:#475569;margin-bottom:12px;">SCL Perdas Totais — ${k?k.nome:''} — Código #${r.id}</div>
+    <div style="text-align:center;font-size:19px;font-weight:bold;margin-bottom:2px;">Relato de Anomalia</div>
+    <div style="text-align:center;font-size:10.5px;color:#475569;margin-bottom:12px;">SCL Perdas Totais — ${k?k.nome:''} — Código #${r.id}</div>
 
     <table style="width:100%;border-collapse:collapse;">
       ${tituloPdf('REAÇÃO — Completar dentro de 24 horas do evento de anomalia')}
@@ -2512,16 +2512,16 @@ function htmlRelatorioAnomaliaPdf(r, k){
       <tr>${celPdf('Departamento', r.departamento)}${celPdf('Área', r.area)}${celPdf('Gatilho', r.gatilhoTexto)}${celPdf('Equipamento Afetado', r.equipamentoAfetado)}${celPdf('Número de Registro', r.numeroRegistro)}<td style="border:1px solid #94a3b8;"></td></tr>
       <tr>${celPdf('Tempo de Inatividade', [r.tempoInatividadeValor,r.tempoInatividadeUnidade].filter(Boolean).join(' '))}${celPdf('Perdas', [r.perdasUnidade,r.perdasValor].filter(Boolean).join(' '))}${celPdf('Produtos não-conformes', [r.produtosNaoConformesValor,r.produtosNaoConformesUnidade].filter(Boolean).join(' '))}<td colspan="3" style="border:1px solid #94a3b8;"></td></tr>
       <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;">
-        <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Descrição da Anomalia (o que aconteceu — resumo detalhado)</div>
-        <div style="font-size:10.5px;padding-top:2px;">${(r.desc||'—').replace(/</g,'&lt;')}</div>
+        <div style="font-size:8.5px;font-weight:bold;color:#475569;text-transform:uppercase;">Descrição da Anomalia (o que aconteceu — resumo detalhado)</div>
+        <div style="font-size:11px;padding-top:2px;">${(r.desc||'—').replace(/</g,'&lt;')}</div>
       </td></tr>
       <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;">
-        <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Ações de Bloqueio do Efeito (Ações Corretivas Imediatas)</div>
-        <div style="font-size:10.5px;padding-top:2px;">${(r.acoesBloqueio||'—').replace(/</g,'&lt;')}</div>
+        <div style="font-size:8.5px;font-weight:bold;color:#475569;text-transform:uppercase;">Ações de Bloqueio do Efeito (Ações Corretivas Imediatas)</div>
+        <div style="font-size:11px;padding-top:2px;">${(r.acoesBloqueio||'—').replace(/</g,'&lt;')}</div>
       </td></tr>
       <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;">
-        <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Observações</div>
-        <div style="font-size:10.5px;padding-top:2px;">${(r.observacoes||'—').replace(/</g,'&lt;')}</div>
+        <div style="font-size:8.5px;font-weight:bold;color:#475569;text-transform:uppercase;">Observações</div>
+        <div style="font-size:11px;padding-top:2px;">${(r.observacoes||'—').replace(/</g,'&lt;')}</div>
       </td></tr>
 
       ${tituloPdf('ANÁLISE DA CAUSA RAIZ — Completar dentro de 5 dias úteis do evento')}
@@ -2531,7 +2531,7 @@ function htmlRelatorioAnomaliaPdf(r, k){
     ${tabelaPdf('Ações de Verificação da Causa Raiz', CAUSA_RAIZ_COLS, cr)}
 
     <table style="width:100%;border-collapse:collapse;">
-      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Checklist de Padronização e Gestão do Conhecimento</td></tr>
+      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;font-size:8.5px;font-weight:bold;color:#475569;text-transform:uppercase;">Checklist de Padronização e Gestão do Conhecimento</td></tr>
       <tr>${celPdf('Mapeamento de Processo precisa atualizar?', r.chkMapeamentoProcesso)}${celPdf('É necessário fazer DTO?', r.chkDto)}${celPdf('É necessário atualizar o padrão?', r.chkPadrao)}${celPdf('Necessário treinamento/comunicação?', r.chkTreinamento)}${celPdf('Necessário monitoramento de IV?', r.chkMonitoramentoIv)}<td style="border:1px solid #94a3b8;"></td></tr>
       ${tituloPdf('PREVENÇÃO — Plano de Ação')}
     </table>
@@ -2545,11 +2545,11 @@ function htmlRelatorioAnomaliaPdf(r, k){
 
     <table style="width:100%;border-collapse:collapse;margin-top:30px;">
       <tr>
-        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10px;text-align:center;">Assinatura do Responsável pela Conclusão</td>
+        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10.5px;text-align:center;">Assinatura do Responsável pela Conclusão</td>
         <td style="width:50%;"></td>
-        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10px;text-align:center;">Assinatura da Liderança</td>
+        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10.5px;text-align:center;">Assinatura da Liderança</td>
       </tr>
-      <tr><td style="padding-top:6px;font-size:9px;text-align:center;color:#475569;">Data: ____/____/______</td><td></td><td style="padding-top:6px;font-size:9px;text-align:center;color:#475569;">Data: ____/____/______</td></tr>
+      <tr><td style="padding-top:6px;font-size:9.5px;text-align:center;color:#475569;">Data: ____/____/______</td><td></td><td style="padding-top:6px;font-size:9.5px;text-align:center;color:#475569;">Data: ____/____/______</td></tr>
     </table>
   </div>`;
 }
@@ -2560,21 +2560,21 @@ async function gerarPdfAnomalia(r, k){
   container.innerHTML = htmlRelatorioAnomaliaPdf(r, k);
   document.body.appendChild(container);
   try{
-    const canvas = await html2canvas(container, {scale:2, backgroundColor:'#ffffff'});
+    const canvas = await html2canvas(container, {scale:3, backgroundColor:'#ffffff', useCORS:true});
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdf = new jsPDF('p', 'mm', 'a4', true);
     const pageWidth = 210, pageHeight = 297;
     const imgWidth = pageWidth;
     const imgHeight = canvas.height * imgWidth / canvas.width;
     let heightLeft = imgHeight;
     let position = 0;
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    const imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
     heightLeft -= pageHeight;
     while(heightLeft > 0){
       position = heightLeft - imgHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
       heightLeft -= pageHeight;
     }
     pdf.save(`Relato_Anomalia_${r.numeroRegistro||r.id}.pdf`);
