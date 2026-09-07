@@ -281,6 +281,23 @@
       </div>
       <div id="planosLoteStatus" class="text-xs mt-3"></div>
     </div>
+
+    <div class="border-t border-white/10 pt-5 mt-5">
+      <h3 class="font-semibold text-slate-200 mb-1">Volume (hL)</h3>
+      <p class="text-slate-400 text-xs mb-3">Meta 2026, Real 2026 e Real 2025, mês a mês (jan–ago). Baixe, edite os números e suba de volta.</p>
+      <div class="flex flex-wrap items-center gap-2">
+        <input type="file" id="volumeCsvUpload" accept=".csv" class="hidden" />
+        <button id="downloadVolumeCsvBtn" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/10 transition text-white text-sm font-medium px-4 py-2 rounded-lg">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+          Baixar CSV de Volume
+        </button>
+        <button id="uploadVolumeCsvBtn" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 transition text-white text-sm font-medium px-4 py-2 rounded-lg shadow shadow-emerald-900/40">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          Atualizar Volume
+        </button>
+      </div>
+      <div id="volumeCsvStatus" class="text-xs mt-3"></div>
+    </div>
   </div>
 </div>
 
@@ -388,7 +405,7 @@ const DATA = {
       meta_total:404.26, real_total:3170.27, var_pct:684.15,
       real_2025_mensal:[null,null,null,null,null,null,null,null]}
   ],
-  volume: {meta:[29700,29350,26250,27400,27000,27200,27500,28800], real:[27324,23824.37,22158,25718,22504,22053,23442,16309], meta_total:223200, real_total:183332.37},
+  volume: {meta:[29700,29350,26250,27400,27000,27200,27500,28800], real:[27324,23824.37,22158,25718,22504,22053,23442,16309], real2025:[null,null,null,null,null,null,null,null], meta_total:223200, real_total:183332.37},
   total_meta: 467718.61,
   total_real: 512896.08
 };
@@ -1243,11 +1260,14 @@ function renderCharts(){
   // VOLUME CHART
   const volMeta = idxRange.map(i=>DATA.volume.meta[i]);
   const volReal = idxRange.map(i=>DATA.volume.real[i]);
+  const volReal2025 = idxRange.map(i=>DATA.volume.real2025 ? DATA.volume.real2025[i] : null);
+  const temVol2025 = volReal2025.some(v=>v!=null);
   charts.volume = new Chart(document.getElementById('volumeChart'), {
     type:'bar',
     data:{ labels: monthsLbl, datasets:[
       {label:'Meta (hL)', data:volMeta, backgroundColor:SERIES_COLORS.meta, borderRadius:6},
-      {label:'Real (hL)', data:volReal, backgroundColor:SERIES_COLORS.ano2026, borderRadius:6}
+      {label:'Real (hL)', data:volReal, backgroundColor:SERIES_COLORS.ano2026, borderRadius:6},
+      ...(temVol2025 ? [{label:'Real 2025 (hL)', data:volReal2025, type:'line', borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false}] : [])
     ]},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' hL'}} },
@@ -3853,6 +3873,76 @@ document.getElementById('planosLoteUpload').addEventListener('change', async (e)
   await processarPlanosEmLote(file);
   e.target.value = '';
 });
+
+/* ============================================================
+   VOLUME (hL) EDITÁVEL — Meta 2026, Real 2026 e Real 2025
+   ============================================================ */
+const VOLUME_CSV_HEADER = ['mes_idx','mes','meta_hl','real_hl','real_2025_hl'];
+
+function exportVolumeCSV(){
+  const linhas = [VOLUME_CSV_HEADER.join(';')];
+  DATA.months.forEach((mes,i)=>{
+    linhas.push([
+      i+1, mes,
+      csvNum(DATA.volume.meta?.[i]), csvNum(DATA.volume.real?.[i]), csvNum(DATA.volume.real2025?.[i])
+    ].join(';'));
+  });
+  const blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'scl_volume_editavel.csv';
+  link.click();
+}
+
+async function handleVolumeCsvUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('volumeCsvStatus');
+  statusEl.className = 'text-xs mt-3 text-slate-400';
+  statusEl.textContent = 'Lendo o arquivo...';
+  try{
+    const texto = await file.text();
+    const linhas = texto.replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
+    const delim = detectarDelimitadorCSV(linhas[0]);
+    const header = parseCsvLine(linhas[0], delim).map(h=>h.trim().toLowerCase());
+    const idx = campo => header.indexOf(campo);
+    const iMesIdx = idx('mes_idx'), iMeta = idx('meta_hl'), iReal = idx('real_hl'), iReal2025 = idx('real_2025_hl');
+    if(iMesIdx===-1){
+      throw new Error('Cabeçalho não reconhecido — confirme que baixou pelo botão "Baixar CSV de Volume".');
+    }
+    const novoMeta = Array(8).fill(null), novoReal = Array(8).fill(null), novoReal2025 = Array(8).fill(null);
+    linhas.slice(1).forEach(linha=>{
+      const cols = parseCsvLine(linha, delim);
+      const mesIdx = numOuNull(cols[iMesIdx]);
+      if(mesIdx==null || mesIdx<1 || mesIdx>8) return;
+      const i = mesIdx - 1;
+      novoMeta[i] = numOuNull(cols[iMeta]);
+      novoReal[i] = numOuNull(cols[iReal]);
+      novoReal2025[i] = numOuNull(cols[iReal2025]);
+    });
+    DATA.volume.meta = novoMeta;
+    DATA.volume.real = novoReal;
+    DATA.volume.real2025 = novoReal2025;
+    DATA.volume.meta_total = novoMeta.reduce((s,v)=>s+(v||0),0);
+    DATA.volume.real_total = novoReal.reduce((s,v)=>s+(v||0),0);
+    await saveDataToStorage();
+    renderAll();
+    statusEl.className = 'text-xs mt-3 text-emerald-400';
+    statusEl.textContent = 'Volume atualizado com sucesso!';
+  }catch(err){
+    console.error(err);
+    statusEl.className = 'text-xs mt-3 text-red-400';
+    statusEl.textContent = err.message || 'Não consegui ler esse arquivo.';
+  }finally{
+    e.target.value = '';
+  }
+}
+
+document.getElementById('downloadVolumeCsvBtn').addEventListener('click', exportVolumeCSV);
+document.getElementById('uploadVolumeCsvBtn').addEventListener('click', ()=>{
+  document.getElementById('volumeCsvUpload').click();
+});
+document.getElementById('volumeCsvUpload').addEventListener('change', handleVolumeCsvUpload);
 
 (async function init(){
   populateMonthFilter();
