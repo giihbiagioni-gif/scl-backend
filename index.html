@@ -7,6 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
   window.addEventListener('DOMContentLoaded', () => {
     if (typeof Chart === 'undefined') {
@@ -547,7 +549,8 @@ const ICONS = {
   drop: `<path d="M12 2s7 8.5 7 13a7 7 0 11-14 0c0-4.5 7-13 7-13z"/>`,
   chevron: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>`,
   gear: `<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/>`,
-  edit: `<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>`
+  edit: `<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>`,
+  download: `<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>`
 };
 function icon(name, cls="w-5 h-5"){
   return `<svg xmlns="http://www.w3.org/2000/svg" class="${cls}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||ICONS.box}</svg>`;
@@ -2111,6 +2114,20 @@ function renderRecordsView(type){
     });
   });
 
+  container.querySelectorAll('[data-pdf-anomalia]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const rec = records.anomalias.find(r=>r.id===parseInt(btn.dataset.pdfAnomalia));
+      if(!rec) return;
+      const textoOriginal = btn.innerHTML;
+      btn.innerHTML = 'Gerando PDF...';
+      btn.disabled = true;
+      await gerarPdfAnomalia(rec, kpiByCod(rec.kpiCod));
+      btn.innerHTML = textoOriginal;
+      btn.disabled = false;
+    });
+  });
+
   container.querySelectorAll('[data-toggle-record]').forEach(row=>{
     row.addEventListener('click', ()=>{
       const id = parseInt(row.dataset.toggleRecord);
@@ -2305,6 +2322,118 @@ function tituloSecaoRCA(txt){
   return `<p class="text-[11px] font-bold text-blue-400 uppercase tracking-wide border-b border-slate-800 pb-1 mt-4 first:mt-0">${txt}</p>`;
 }
 
+// ---------- geração do PDF do Relato de Anomalia, no layout do modelo original ----------
+function celPdf(label, valor, largura){
+  return `<td style="border:1px solid #94a3b8;padding:4px 6px;vertical-align:top;${largura?`width:${largura};`:''}">
+    <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">${label}</div>
+    <div style="font-size:10.5px;color:#0f172a;min-height:14px;">${(valor||'').toString().replace(/</g,'&lt;') || '&nbsp;'}</div>
+  </td>`;
+}
+function tituloPdf(txt){
+  return `<tr><td colspan="12" style="background:#1f2937;color:#fff;font-weight:bold;font-size:10.5px;padding:5px 8px;">${txt}</td></tr>`;
+}
+function tabelaPdf(titulo, cols, linhas){
+  const linhasComDado = linhas.filter(l=>Object.values(l).some(v=>v));
+  const linhasFinal = linhasComDado.length ? linhasComDado : [Object.fromEntries(cols.map(c=>[c.key,'']))];
+  return `
+  <table style="width:100%;border-collapse:collapse;margin-top:6px;margin-bottom:10px;">
+    <thead>
+      <tr>${cols.map(c=>`<th style="border:1px solid #94a3b8;background:#e2e8f0;font-size:8.5px;padding:3px 5px;text-align:left;">${c.label}</th>`).join('')}</tr>
+    </thead>
+    <tbody>
+      ${linhasFinal.map(l=>`<tr>${cols.map(c=>`<td style="border:1px solid #94a3b8;padding:3px 5px;font-size:9px;min-height:16px;">${(l[c.key]||'').toString().replace(/</g,'&lt;')||'&nbsp;'}</td>`).join('')}</tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function htmlRelatorioAnomaliaPdf(r, k){
+  const cr = r.causaRaizAcoes || [];
+  const pv = r.planoPrevencao || [];
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;width:760px;">
+    <div style="text-align:center;font-size:18px;font-weight:bold;margin-bottom:2px;">Relato de Anomalia</div>
+    <div style="text-align:center;font-size:10px;color:#475569;margin-bottom:12px;">SCL Perdas Totais — ${k?k.nome:''} — Código #${r.id}</div>
+
+    <table style="width:100%;border-collapse:collapse;">
+      ${tituloPdf('REAÇÃO — Completar dentro de 24 horas do evento de anomalia')}
+      <tr>${celPdf('CDD', r.cdd)}${celPdf('Data da Anomalia', r.dataAnomalia)}${celPdf('Turno / Equipe', r.turnoEquipe)}${celPdf('Iniciado Por', r.iniciadoPor)}${celPdf('Responsável pela Conclusão', r.responsavelConclusao)}${celPdf('Status', r.status)}</tr>
+      <tr>${celPdf('Departamento', r.departamento)}${celPdf('Área', r.area)}${celPdf('Gatilho', r.gatilhoTexto)}${celPdf('Equipamento Afetado', r.equipamentoAfetado)}${celPdf('Número de Registro', r.numeroRegistro)}<td style="border:1px solid #94a3b8;"></td></tr>
+      <tr>${celPdf('Tempo de Inatividade', [r.tempoInatividadeValor,r.tempoInatividadeUnidade].filter(Boolean).join(' '))}${celPdf('Perdas', [r.perdasUnidade,r.perdasValor].filter(Boolean).join(' '))}${celPdf('Produtos não-conformes', [r.produtosNaoConformesValor,r.produtosNaoConformesUnidade].filter(Boolean).join(' '))}<td colspan="3" style="border:1px solid #94a3b8;"></td></tr>
+      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;">
+        <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Descrição da Anomalia (o que aconteceu — resumo detalhado)</div>
+        <div style="font-size:10.5px;padding-top:2px;">${(r.desc||'—').replace(/</g,'&lt;')}</div>
+      </td></tr>
+      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;">
+        <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Ações de Bloqueio do Efeito (Ações Corretivas Imediatas)</div>
+        <div style="font-size:10.5px;padding-top:2px;">${(r.acoesBloqueio||'—').replace(/</g,'&lt;')}</div>
+      </td></tr>
+      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;">
+        <div style="font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Observações</div>
+        <div style="font-size:10.5px;padding-top:2px;">${(r.observacoes||'—').replace(/</g,'&lt;')}</div>
+      </td></tr>
+
+      ${tituloPdf('ANÁLISE DA CAUSA RAIZ — Completar dentro de 5 dias úteis do evento')}
+      <tr>${celPdf('Há outro Relato de Anomalia pro mesmo problema?', r.outroRelato)}<td colspan="2" style="border:1px solid #94a3b8;"></td>${celPdf('Quem está conduzindo a análise', r.quemConduzAnalise)}<td colspan="2" style="border:1px solid #94a3b8;"></td></tr>
+    </table>
+
+    ${tabelaPdf('Ações de Verificação da Causa Raiz', CAUSA_RAIZ_COLS, cr)}
+
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;font-size:8px;font-weight:bold;color:#475569;text-transform:uppercase;">Checklist de Padronização e Gestão do Conhecimento</td></tr>
+      <tr>${celPdf('Mapeamento de Processo precisa atualizar?', r.chkMapeamentoProcesso)}${celPdf('É necessário fazer DTO?', r.chkDto)}${celPdf('É necessário atualizar o padrão?', r.chkPadrao)}${celPdf('Necessário treinamento/comunicação?', r.chkTreinamento)}${celPdf('Necessário monitoramento de IV?', r.chkMonitoramentoIv)}<td style="border:1px solid #94a3b8;"></td></tr>
+      ${tituloPdf('PREVENÇÃO — Plano de Ação')}
+    </table>
+
+    ${tabelaPdf('Plano de Ação', PREVENCAO_COLS, pv)}
+
+    <table style="width:100%;border-collapse:collapse;">
+      ${tituloPdf('ENCERRAMENTO DO REPORTE')}
+      <tr>${celPdf('As ações corretivas resolveram a causa raiz?', r.resolveuCausaRaiz)}${celPdf('É necessário escalar para a zona?', r.escalarZona)}${celPdf('É necessário escalar CAPEX?', r.escalarCapex)}${celPdf('Foi enviada inovação/melhor prática/GOP?', r.enviouInovacao)}${celPdf('Data de Conclusão', r.dataConclusao)}<td style="border:1px solid #94a3b8;"></td></tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;margin-top:30px;">
+      <tr>
+        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10px;text-align:center;">Assinatura do Responsável pela Conclusão</td>
+        <td style="width:50%;"></td>
+        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10px;text-align:center;">Assinatura da Liderança</td>
+      </tr>
+      <tr><td style="padding-top:6px;font-size:9px;text-align:center;color:#475569;">Data: ____/____/______</td><td></td><td style="padding-top:6px;font-size:9px;text-align:center;color:#475569;">Data: ____/____/______</td></tr>
+    </table>
+  </div>`;
+}
+
+async function gerarPdfAnomalia(r, k){
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#ffffff;padding:24px;';
+  container.innerHTML = htmlRelatorioAnomaliaPdf(r, k);
+  document.body.appendChild(container);
+  try{
+    const canvas = await html2canvas(container, {scale:2, backgroundColor:'#ffffff'});
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210, pageHeight = 297;
+    const imgWidth = pageWidth;
+    const imgHeight = canvas.height * imgWidth / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+    while(heightLeft > 0){
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    pdf.save(`Relato_Anomalia_${r.numeroRegistro||r.id}.pdf`);
+  }catch(e){
+    console.error(e);
+    alert('Não consegui gerar o PDF. Tenta de novo em alguns segundos.');
+  }finally{
+    document.body.removeChild(container);
+  }
+}
+
 function anomaliaFormView(r, k){
   const cr = r.causaRaizAcoes || [];
   const pv = r.planoPrevencao || [];
@@ -2315,9 +2444,14 @@ function anomaliaFormView(r, k){
         <p class="text-[10px] font-semibold text-slate-500 mb-1">DESCRIÇÃO DA ANOMALIA</p>
         <p class="text-xs text-slate-200">${r.desc||'—'}</p>
       </div>
-      <button data-edit-record="${r.id}" data-edit-type="anomalias" class="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-blue-400 transition">
-        ${icon('edit','w-3.5 h-3.5')} Editar
-      </button>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button data-pdf-anomalia="${r.id}" class="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition">
+          ${icon('download','w-3.5 h-3.5')} Baixar PDF
+        </button>
+        <button data-edit-record="${r.id}" data-edit-type="anomalias" class="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-blue-400 transition">
+          ${icon('edit','w-3.5 h-3.5')} Editar
+        </button>
+      </div>
     </div>
 
     ${tituloSecaoRCA('Reação — completar em 24h do evento')}
