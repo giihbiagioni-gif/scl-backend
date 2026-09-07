@@ -723,9 +723,10 @@ function renderTree(){
   // caixa final com META/REAL lado a lado + badge de % de atingimento (igual ao padrão geral)
   // caixa final com META/REAL lado a lado + badge de % de atingimento (igual ao padrão geral)
   // quando monthsCod é passado, o próprio badge de % vira o gatilho para abrir os meses que estouraram
-  function valueBox(meta, real, fmt, varPct, monthsCod){
+  function valueBox(meta, real, fmt, varPct, monthsCod, ytd){
     const s = varPct==null ? {bg:"bg-slate-600", text:"text-slate-500", chip:"rgba(100,116,139,.15)"} : statusColor(varPct);
     const clickable = monthsCod!=null;
+    const ytdS = (ytd && ytd.varPct!=null) ? statusColor(ytd.varPct) : null;
     return `
     <div class="flex items-center gap-0 fade-in">
       <svg class="w-4 h-6 flex-shrink-0 text-slate-700" viewBox="0 0 16 24"><path d="M0 12 H16" stroke="currentColor" fill="none" stroke-width="1.5"/></svg>
@@ -735,6 +736,9 @@ function renderTree(){
         <span ${clickable ? `data-kpi-months="${monthsCod}" role="button" tabindex="0"` : ''} class="flex items-center gap-1 font-bold px-1.5 py-1 rounded-full text-[9px] ${clickable ? 'cursor-pointer hover:brightness-125 transition' : ''} ${s.text}" style="background:${s.chip}">
           <span class="w-1.5 h-1.5 rounded-full ${s.bg}"></span>${varPct==null?'—':fmtPct(varPct)}
         </span>
+        ${ytdS ? `<span class="flex items-center gap-1 font-bold px-1.5 py-1 rounded-full text-[9px] ${ytdS.text}" style="background:${ytdS.chip}" title="Comparativo com o mesmo período de 2025">
+          <span class="w-1.5 h-1.5 rounded-full ${ytdS.bg}"></span>25→26 ${fmtPct(ytd.varPct)}
+        </span>` : ''}
       </div>
     </div>`;
   }
@@ -743,13 +747,15 @@ function renderTree(){
   function unitRow(k, unit){
     const key = k.cod+":"+unit;
     const open = expandedUnit.has(key);
-    let meta, real, varPct, fmt, ic, label;
+    let meta, real, varPct, fmt, ic, label, ytd = null;
     if(unit==="RS"){
       ({meta, real, varPct} = kpiMetaReal(k)); fmt = fmtBRLc; ic = 'cash'; label = 'R$';
     } else if(unit==="WQI"){
       ({meta, real, varPct} = kpiWqiMetaReal(k)); fmt = fmtWqi; ic = 'target'; label = 'WQI';
+      ytd = kpiYtdCompare(k, 'WQI');
     } else {
       ({meta, real, varPct} = kpiFgliMetaReal(k)); fmt = fmtFgli; ic = 'drop'; label = 'FGLI';
+      ytd = kpiYtdCompare(k, 'FGLI');
     }
     return `
     <div class="flex items-center gap-0">
@@ -757,7 +763,7 @@ function renderTree(){
         ${icon(ic,'w-3 h-3')} ${label}
         <svg class="w-2.5 h-2.5 transition-transform duration-200 ${open?'rotate-90':''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">${ICONS.chevron}</svg>
       </button>
-      ${open ? valueBox(meta, real, fmt, varPct, unit==="RS" ? k.cod : null) : ''}
+      ${open ? valueBox(meta, real, fmt, varPct, unit==="RS" ? k.cod : null, ytd) : ''}
     </div>`;
   }
 
@@ -838,28 +844,40 @@ function renderTree(){
     </div>`;
   }
 
-  // compara o REAL do período filtrado (2026) com o mesmo período em 2025 (aba "R$ 2025")
-  function kpiYtdCompare(k){
-    if(!k.real_2025_mensal) return {real2026:null, real2025:null, varPct:null};
-    const real2026 = sumFiltered(k.real_mensal);
-    const real2025 = sumFiltered(k.real_2025_mensal);
+  // compara o REAL do período filtrado (2026) com o mesmo período em 2025, pra qualquer unidade
+  function kpiYtdCompare(k, unit){
+    unit = unit || 'RS';
+    const pares = {
+      RS:   [k.real_mensal, k.real_2025_mensal],
+      HL:   [k.hl_real_mensal, k.hl_real_2025_mensal],
+      FGLI: [k.fgli_real_mensal, k.fgli_real_2025_mensal],
+      WQI:  [k.wqi_real_mensal, k.wqi_real_2025_mensal]
+    };
+    const [real2026Arr, real2025Arr] = pares[unit] || pares.RS;
+    if(!real2026Arr || !real2025Arr) return {real2026:null, real2025:null, varPct:null};
+    // R$/HL e WQI são taxas/índices (usa média); R$ e FGLI são valores acumuláveis (usa soma)
+    const agregador = (unit==='HL' || unit==='WQI') ? avgFiltered : sumFiltered;
+    const real2026 = agregador(real2026Arr);
+    const real2025 = agregador(real2025Arr);
     const varPct = real2025 ? ((real2026-real2025)/real2025*100) : null;
     return {real2026, real2025, varPct};
   }
 
-  // linha fixa com o comparativo YTD 2025 x 2026 (mesmo período filtrado)
-  function ytdLine(k){
-    const {varPct} = kpiYtdCompare(k);
+  // linha fixa com o comparativo YTD 2025 x 2026 (mesmo período filtrado) — genérica pra qualquer unidade
+  function ytdLineUnit(k, unit, label, ic){
+    const {varPct} = kpiYtdCompare(k, unit);
     if(varPct==null) return '';
     const s = statusColor(varPct);
     return `
     <div class="flex items-center justify-between text-[9px] mt-1">
-      <span class="flex items-center gap-1 text-slate-500">${icon('tree','w-3 h-3')} YTD 25→26</span>
+      <span class="flex items-center gap-1 text-slate-500">${icon(ic,'w-3 h-3')} ${label}</span>
       <span class="flex items-center gap-1 font-bold px-1.5 py-0.5 rounded-full ${s.text}" style="background:${s.chip}">
         <span class="w-1.5 h-1.5 rounded-full ${s.bg}"></span>${fmtPct(varPct)}
       </span>
     </div>`;
   }
+  function ytdLine(k){ return ytdLineUnit(k, 'RS', 'YTD 25→26', 'tree'); }
+  function rsPorHlYtdLine(k){ return ytdLineUnit(k, 'HL', 'R$/HL YTD 25→26', 'cash'); }
 
   // pequeno card de "sub-item" (3º nível da árvore) — o detalhamento abre para o lado
   // linha com o código da conta gerencial (OBZ) do indicador
@@ -950,6 +968,7 @@ function renderTree(){
           </span>
         </div>
         ${rsPorHlLine(k)}
+        ${rsPorHlYtdLine(k)}
         ${gatilhoLine(k)}
         ${priceIndexLine()}
         ${ytdLine(k)}
@@ -1518,7 +1537,7 @@ function exportCSV(){
    volta pelo botão "Atualizar CSV" atualiza o site inteiro.
    ============================================================ */
 
-const CSV_EDITAVEL_HEADER = ['kpi_cod','kpi_nome','mes_idx','mes','meta_rs','real_rs','real_2025_rs','fgli_meta_hl','fgli_real_hl','rs_por_hl_meta','rs_por_hl_real','wqi_meta','wqi_real','gatilho_rs'];
+const CSV_EDITAVEL_HEADER = ['kpi_cod','kpi_nome','mes_idx','mes','meta_rs','real_rs','real_2025_rs','fgli_meta_hl','fgli_real_hl','fgli_real_2025_hl','rs_por_hl_meta','rs_por_hl_real','rs_por_hl_real_2025','wqi_meta','wqi_real','wqi_real_2025','gatilho_rs'];
 
 function csvNum(v){ return (v===null || v===undefined || v==='') ? '' : v; }
 
@@ -1529,9 +1548,9 @@ function exportEditableCSV(){
       linhas.push([
         k.cod, `"${k.nome}"`, i+1, mes,
         csvNum(k.meta_mensal?.[i]), csvNum(k.real_mensal?.[i]), csvNum(k.real_2025_mensal?.[i]),
-        csvNum(k.fgli_meta_mensal?.[i]), csvNum(k.fgli_real_mensal?.[i]),
-        csvNum(k.hl_meta_mensal?.[i]), csvNum(k.hl_real_mensal?.[i]),
-        csvNum(k.wqi_meta_mensal?.[i]), csvNum(k.wqi_real_mensal?.[i]),
+        csvNum(k.fgli_meta_mensal?.[i]), csvNum(k.fgli_real_mensal?.[i]), csvNum(k.fgli_real_2025_mensal?.[i]),
+        csvNum(k.hl_meta_mensal?.[i]), csvNum(k.hl_real_mensal?.[i]), csvNum(k.hl_real_2025_mensal?.[i]),
+        csvNum(k.wqi_meta_mensal?.[i]), csvNum(k.wqi_real_mensal?.[i]), csvNum(k.wqi_real_2025_mensal?.[i]),
         csvNum(k.gatilho)
       ].join(';'));
     });
@@ -1584,9 +1603,9 @@ function parseEditableCSV(texto){
   const idx = campo => header.indexOf(campo);
 
   const iCod = idx('kpi_cod'), iMesIdx = idx('mes_idx'), iMeta = idx('meta_rs'), iReal = idx('real_rs'), iReal2025 = idx('real_2025_rs'),
-        iFgliMeta = idx('fgli_meta_hl'), iFgliReal = idx('fgli_real_hl'),
-        iHlMeta = idx('rs_por_hl_meta'), iHlReal = idx('rs_por_hl_real'),
-        iWqiMeta = idx('wqi_meta'), iWqiReal = idx('wqi_real'), iGatilho = idx('gatilho_rs');
+        iFgliMeta = idx('fgli_meta_hl'), iFgliReal = idx('fgli_real_hl'), iFgliReal2025 = idx('fgli_real_2025_hl'),
+        iHlMeta = idx('rs_por_hl_meta'), iHlReal = idx('rs_por_hl_real'), iHlReal2025 = idx('rs_por_hl_real_2025'),
+        iWqiMeta = idx('wqi_meta'), iWqiReal = idx('wqi_real'), iWqiReal2025 = idx('wqi_real_2025'), iGatilho = idx('gatilho_rs');
 
   if(iCod===-1 || iMesIdx===-1){
     throw new Error('Cabeçalho do CSV não reconhecido — confirme que baixou o arquivo pelo botão "Baixar CSV (editar)".');
@@ -1601,9 +1620,9 @@ function parseEditableCSV(texto){
     if(!porCod[cod]){
       porCod[cod] = {
         meta_mensal: Array(8).fill(null), real_mensal: Array(8).fill(null), real_2025_mensal: Array(8).fill(null),
-        fgli_meta_mensal: Array(8).fill(null), fgli_real_mensal: Array(8).fill(null),
-        hl_meta_mensal: Array(8).fill(null), hl_real_mensal: Array(8).fill(null),
-        wqi_meta_mensal: Array(8).fill(null), wqi_real_mensal: Array(8).fill(null),
+        fgli_meta_mensal: Array(8).fill(null), fgli_real_mensal: Array(8).fill(null), fgli_real_2025_mensal: Array(8).fill(null),
+        hl_meta_mensal: Array(8).fill(null), hl_real_mensal: Array(8).fill(null), hl_real_2025_mensal: Array(8).fill(null),
+        wqi_meta_mensal: Array(8).fill(null), wqi_real_mensal: Array(8).fill(null), wqi_real_2025_mensal: Array(8).fill(null),
         gatilho: undefined
       };
     }
@@ -1614,10 +1633,13 @@ function parseEditableCSV(texto){
     k.real_2025_mensal[i] = numOuNull(cols[iReal2025]);
     k.fgli_meta_mensal[i] = numOuNull(cols[iFgliMeta]);
     k.fgli_real_mensal[i] = numOuNull(cols[iFgliReal]);
+    k.fgli_real_2025_mensal[i] = numOuNull(cols[iFgliReal2025]);
     k.hl_meta_mensal[i] = numOuNull(cols[iHlMeta]);
     k.hl_real_mensal[i] = numOuNull(cols[iHlReal]);
+    k.hl_real_2025_mensal[i] = numOuNull(cols[iHlReal2025]);
     k.wqi_meta_mensal[i] = numOuNull(cols[iWqiMeta]);
     k.wqi_real_mensal[i] = numOuNull(cols[iWqiReal]);
+    k.wqi_real_2025_mensal[i] = numOuNull(cols[iWqiReal2025]);
     // gatilho é o mesmo em todas as linhas do KPI — só precisa pegar uma vez
     if(k.gatilho===undefined) k.gatilho = numOuNull(cols[iGatilho]);
   });
@@ -1636,7 +1658,7 @@ async function handleCsvUpload(e){
         const novo = porCod[k.cod];
         if(!novo) return;
         // WQI só existe de verdade para Quebra PA (22007) — evita que ele "vaze" pra outros KPIs via CSV
-        if(k.cod !== 22007){ novo.wqi_meta_mensal = Array(8).fill(null); novo.wqi_real_mensal = Array(8).fill(null); }
+        if(k.cod !== 22007){ novo.wqi_meta_mensal = Array(8).fill(null); novo.wqi_real_mensal = Array(8).fill(null); novo.wqi_real_2025_mensal = Array(8).fill(null); }
         Object.assign(k, novo);
         atualizados++;
       });
