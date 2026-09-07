@@ -3669,11 +3669,11 @@ async function saveDataToStorage(){
   if(!hasPersistentStorage) return;
   try{
     const snapshot = DATA.kpis.map(k=>({
-      cod:k.cod, meta_mensal:k.meta_mensal, real_mensal:k.real_mensal,
-      fgli_meta_mensal:k.fgli_meta_mensal, fgli_real_mensal:k.fgli_real_mensal,
-      hl_meta_mensal:k.hl_meta_mensal, hl_real_mensal:k.hl_real_mensal,
+      cod:k.cod, meta_mensal:k.meta_mensal, real_mensal:k.real_mensal, real_2025_mensal:k.real_2025_mensal||null,
+      fgli_meta_mensal:k.fgli_meta_mensal, fgli_real_mensal:k.fgli_real_mensal, fgli_real_2025_mensal:k.fgli_real_2025_mensal||null,
+      hl_meta_mensal:k.hl_meta_mensal, hl_real_mensal:k.hl_real_mensal, hl_real_2025_mensal:k.hl_real_2025_mensal||null,
       gatilho:k.gatilho,
-      wqi_meta_mensal:k.wqi_meta_mensal||null, wqi_real_mensal:k.wqi_real_mensal||null
+      wqi_meta_mensal:k.wqi_meta_mensal||null, wqi_real_mensal:k.wqi_real_mensal||null, wqi_real_2025_mensal:k.wqi_real_2025_mensal||null
     }));
     await storageSet(STORAGE_KEY_DATA, JSON.stringify({kpis:snapshot, volume:DATA.volume}));
   }catch(e){ console.warn('Não foi possível salvar os dados da planilha:', e); }
