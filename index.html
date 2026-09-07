@@ -705,8 +705,9 @@ function renderTree(){
 
   // painel de detalhamento — R$ e FGLI empilhados (um em cima do outro), cada um abrindo
   // seus valores de META/REAL lado a lado para a direita
-  // Quebra AG, Refugo Fábrica e Erro Prog. Puxada não têm ramo de FGLI (sem dado real de FGLI pra eles)
-  const NO_FGLI_CODES = [22010, 22201, 22008, 22016];
+  // FGLI é válido para: Vencido, Quebra PA, Reposição, Dif. Inventário PA e Erro Prog. Puxada.
+  // Quebra AG, Refugo Fábrica e Dif. Estoque AG não têm ramo de FGLI.
+  const NO_FGLI_CODES = [22010, 22201, 22008];
   // pra objetos "virtuais" de grupo, decide se tem FGLI pelos dados combinados, não pelo código
   function hasFgliData(k){
     if(k.isGroup) return (k.fgli_meta_mensal||[]).some(v=>v!=null) || (k.fgli_real_mensal||[]).some(v=>v!=null);
