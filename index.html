@@ -192,7 +192,13 @@
   <!-- ==================== CHARTS ROW 4 — R$/HL SCL Total 2026 x 2025 ==================== -->
   <section class="grid grid-cols-1 gap-6">
     <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
-      <h3 class="text-sm font-bold text-slate-200 mb-1">R$/HL — Prejuízo Total SCL vs Volume Vendido: 2026 x 2025</h3>
+      <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
+        <h3 class="text-sm font-bold text-slate-200">R$/HL — Prejuízo Total SCL vs Volume Vendido: 2026 x 2025</h3>
+        <label class="flex items-center gap-2 text-[11px] text-slate-400 cursor-pointer select-none whitespace-nowrap">
+          <input type="checkbox" id="toggleRsHlPorIndicador" class="w-3.5 h-3.5 rounded accent-emerald-400 cursor-pointer" />
+          Mostrar R$/HL de cada indicador
+        </label>
+      </div>
       <p class="text-xs text-slate-500 mb-3">Prejuízo total (soma dos KPIs selecionados) dividido pelo volume vendido (hecto), mês a mês</p>
       <div class="h-72 relative">
         <canvas id="rsHlSclChart"></canvas>
@@ -445,6 +451,7 @@ let selectedKpis = new Set(DATA.kpis.map(k=>k.cod));
 let selectedKpisPlanos = new Set(DATA.kpis.map(k=>k.cod)); // filtro de KPI da aba "Planos de Ação"
 let mostrarPrecoMercado = true; // controla se a série "Preço Médio de Mercado" aparece nos gráficos
 let mostrarComparativoAnoAnterior = true; // controla se o "vs 2025" aparece nos cards de indicadores
+let mostrarRsHlPorIndicador = false; // controla se o gráfico de R$/HL mostra uma linha por KPI, além do total
 let selectedMonths = new Set(DATA.months.map((_,i)=>i)); // conjunto de índices de mês selecionados (todos por padrão)
 let expandedGroups = new Set(); // grupos da árvore (Quebras / Diferença de Estoque) atualmente abertos
 let treeSortMode = 'auto'; // 'auto' | 'perda' | 'az' | 'manual'
@@ -1378,12 +1385,19 @@ function renderCharts(){
   } else {
     if(rsHlSclCanvas) rsHlSclCanvas.classList.remove('hidden');
     if(rsHlSclEmptyMsg) rsHlSclEmptyMsg.classList.add('hidden');
+    // uma linha de R$/HL por KPI selecionado (perda daquele KPI ÷ volume vendido total), só se o checkbox estiver marcado
+    const datasetsPorIndicador = mostrarRsHlPorIndicador ? kpis.map(k=>{
+      const rsHlKpi2026 = idxRange.map((_,pos) => volume2026PorMes[pos] ? ((k.real_mensal[idxRange[pos]]||0)/volume2026PorMes[pos]) : null);
+      return {label:`R$/HL ${k.nome}`, data:rsHlKpi2026, borderColor:k.cor, backgroundColor:'transparent', borderWidth:1.5, borderDash:[1,2], tension:.3, pointRadius:2, pointBackgroundColor:k.cor, fill:false, yAxisID:'y'};
+    }) : [];
+
     charts.rsHlScl = new Chart(rsHlSclCanvas, {
       type:'line',
       data:{ labels: monthsLbl, datasets:[
         {label:'R$/HL 2026', data:rsHlScl2026, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:4, fill:true, pointBackgroundColor:SERIES_COLORS.ano2026, yAxisID:'y'},
         {label:'R$/HL 2025', data:rsHlScl2025, borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false, yAxisID:'y'},
-        {label:'Volume 25→26 (%)', data:volVarPctPorMes, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[2,2], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'}
+        {label:'Volume 25→26 (%)', data:volVarPctPorMes, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[2,2], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'},
+        ...datasetsPorIndicador
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='y1' ? (ctx.dataset.label+': '+fmtPct(ctx.raw)) : (ctx.dataset.label+': '+fmtBRLc(ctx.raw)+'/hL')}} },
@@ -4045,6 +4059,10 @@ document.getElementById('volumeCsvUpload').addEventListener('change', handleVolu
   document.getElementById('toggleComparativoAnoAnterior').addEventListener('change', (e)=>{
     mostrarComparativoAnoAnterior = e.target.checked;
     renderSummary();
+  });
+  document.getElementById('toggleRsHlPorIndicador').addEventListener('change', (e)=>{
+    mostrarRsHlPorIndicador = e.target.checked;
+    renderCharts();
   });
   const [dataRestored, recordsRestored, justRestored] = await Promise.all([loadDataFromStorage(), loadRecordsFromStorage(), loadJustificativasFromStorage()]);
   await loadLastFileMetaFromStorage();
