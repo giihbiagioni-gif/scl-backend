@@ -2440,6 +2440,9 @@ function renderRecordsView(type){
         await addRecordToStorage(type, rec);
         textarea.classList.add('ring-1','ring-emerald-500');
         setTimeout(()=>textarea.classList.remove('ring-1','ring-emerald-500'), 500);
+
+        // se o comentário indicar que o relato de anomalia não é necessário, remove o relato vinculado a esse plano
+        if(type==='planos') await removerRelatoSeComentarioDispensar(rec);
       }, 600);
     });
   });
@@ -3644,6 +3647,31 @@ function extrairDataAnomaliaTexto(desc, fallback){
 }
 
 // se a descrição do plano falar em "relato de anomalia" e ainda não existir um relato ligado a ele, cria automaticamente
+// se o comentário do plano indicar que o relato de anomalia não é necessário, remove o relato vinculado a ele
+function normalizarParaChecagem(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+const FRASES_DISPENSA_RELATO = [
+  'sem necessidade de relato', 'nao precisa de relato', 'nao necessita de relato',
+  'relato desnecessario', 'relato nao necessario', 'cancelar relato', 'dispensa relato', 'sem necessidade de relato de anomalia'
+];
+async function removerRelatoSeComentarioDispensar(plano){
+  const texto = normalizarParaChecagem(plano.comentario);
+  const dispensou = FRASES_DISPENSA_RELATO.some(f=>texto.includes(f));
+  if(!dispensou) return;
+
+  const relatosLigados = records.anomalias.filter(r=>r.planoRef===plano.id);
+  if(relatosLigados.length===0) return;
+
+  for(const r of relatosLigados){
+    records.anomalias = records.anomalias.filter(x=>x.id!==r.id);
+    await deleteRecordFromStorage('anomalias', r.id);
+  }
+  if(activeTab==='anomalias') renderRecordsView('anomalias');
+  renderTabBar();
+  showUploadStatus(`Comentário indica que o relato não é necessário — relato de anomalia removido automaticamente (plano #${plano.id}).`, true);
+}
+
 async function sincronizarAnomaliaDoPlano(plano){
   if(!plano || !(plano.desc||'').toLowerCase().includes('relato de anomalia')) return;
   if(records.anomalias.some(r=>r.planoRef===plano.id)) return; // já existe, não duplica
