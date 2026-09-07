@@ -2292,6 +2292,20 @@ function renderRecordsView(type){
     });
   });
 
+  container.querySelectorAll('[data-import-plano-anomalia]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const anomaliaId = parseInt(btn.dataset.importPlanoAnomalia);
+      const idx = parseInt(btn.dataset.importPlanoIdx);
+      const textoOriginal = btn.innerHTML;
+      btn.innerHTML = '...';
+      btn.disabled = true;
+      const plano = await importarLinhaComoPlano(anomaliaId, idx);
+      btn.innerHTML = plano ? '✓ Importado' : textoOriginal;
+      if(!plano) btn.disabled = false;
+    });
+  });
+
   container.querySelectorAll('[data-toggle-record]').forEach(row=>{
     row.addEventListener('click', ()=>{
       const id = parseInt(row.dataset.toggleRecord);
@@ -2694,8 +2708,11 @@ function anomaliaFormView(r, k){
     ${tituloSecaoRCA('Prevenção — Plano de Ação')}
     <div class="overflow-x-auto">
       <table class="w-full text-[10px] border-collapse mt-1">
-        <thead><tr class="text-slate-500 border-b border-slate-800">${PREVENCAO_COLS.map(c=>`<th class="py-1 pr-2 text-left font-semibold">${c.label}</th>`).join('')}</tr></thead>
-        <tbody>${pv.filter(row=>Object.values(row).some(v=>v)).map(row=>`<tr class="border-b border-slate-800/50">${PREVENCAO_COLS.map(c=>`<td class="py-1 pr-2 text-slate-300">${row[c.key]||'—'}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${PREVENCAO_COLS.length}" class="py-2 text-slate-600">Nenhuma ação registrada.</td></tr>`}</tbody>
+        <thead><tr class="text-slate-500 border-b border-slate-800"><th class="py-1 pr-2"></th>${PREVENCAO_COLS.map(c=>`<th class="py-1 pr-2 text-left font-semibold">${c.label}</th>`).join('')}</tr></thead>
+        <tbody>${pv.map((row,idx)=>({row,idx})).filter(({row})=>Object.values(row).some(v=>v)).map(({row,idx})=>`<tr class="border-b border-slate-800/50">
+          <td class="py-1 pr-2">${row.acao ? `<button data-import-plano-anomalia="${r.id}" data-import-plano-idx="${idx}" class="text-[9px] font-semibold text-emerald-400 hover:text-emerald-300 border border-emerald-700 rounded px-1.5 py-0.5 whitespace-nowrap transition hover:bg-emerald-900/30">+ Importar</button>` : ''}</td>
+          ${PREVENCAO_COLS.map(c=>`<td class="py-1 pr-2 text-slate-300">${row[c.key]||'—'}</td>`).join('')}
+        </tr>`).join('') || `<tr><td colspan="${PREVENCAO_COLS.length+1}" class="py-2 text-slate-600">Nenhuma ação registrada.</td></tr>`}</tbody>
       </table>
     </div>
 
@@ -3802,6 +3819,42 @@ async function perguntarSubirPlanosTracados(rec){
     await addRecordToStorage('planos', plano);
   }
   alert(`Pronto! ${criados} plano(s) novo(s) e ${atualizados} atualizado(s) na aba de Planos de Ação.`);
+}
+
+// importa uma linha específica da tabela de Prevenção de um relato como um plano de ação de verdade,
+// já com um comentário referenciando o relato de origem
+async function importarLinhaComoPlano(anomaliaId, idx){
+  const an = records.anomalias.find(r=>r.id===anomaliaId);
+  if(!an || !an.planoPrevencao || !an.planoPrevencao[idx]) return;
+  const linha = an.planoPrevencao[idx];
+  if(!linha.acao || !linha.acao.trim()) return;
+
+  let plano = records.planos.find(p => p.anomaliaRef === an.id && p.anomaliaLinhaIdx === idx);
+  const comentarioBase = `Plano de ação criado a partir do Relato de Anomalia #${an.numeroRegistro || an.id}${an.area ? ' ('+an.area+')' : ''}.`;
+  const comentarioFinal = linha.comentarios ? `${comentarioBase} ${linha.comentarios}` : comentarioBase;
+
+  if(plano){
+    plano.desc = linha.acao;
+    plano.resp = linha.responsavel || an.resp || '';
+    plano.data = linha.dataLimite || an.data || null;
+    plano.status = linha.status || plano.status || 'Pendente';
+    plano.comentario = comentarioFinal;
+  } else {
+    plano = {
+      id: nextRecordId++,
+      kpiCod: an.kpiCod, mes: an.mes, desc: linha.acao,
+      resp: linha.responsavel || an.resp || '',
+      data: linha.dataLimite || an.data || null,
+      dataCriacao: an.dataCriacao || null, dataConclusao: null,
+      status: linha.status || 'Pendente',
+      img: null, evidenciaSugerida: false, comentario: comentarioFinal,
+      anomaliaRef: an.id, anomaliaLinhaIdx: idx
+    };
+    records.planos.push(plano);
+  }
+  await addRecordToStorage('planos', plano);
+  renderTabBar();
+  return plano;
 }
 
 async function deleteRecordFromStorage(type, id){
