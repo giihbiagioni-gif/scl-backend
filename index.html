@@ -2543,13 +2543,15 @@ function htmlRelatorioAnomaliaPdf(r, k){
       <tr>${celPdf('As ações corretivas resolveram a causa raiz?', r.resolveuCausaRaiz)}${celPdf('É necessário escalar para a zona?', r.escalarZona)}${celPdf('É necessário escalar CAPEX?', r.escalarCapex)}${celPdf('Foi enviada inovação/melhor prática/GOP?', r.enviouInovacao)}${celPdf('Data de Conclusão', r.dataConclusao)}<td style="border:1px solid #94a3b8;"></td></tr>
     </table>
 
-    <table style="width:100%;border-collapse:collapse;margin-top:30px;">
+    <table style="width:100%;border-collapse:separate;border-spacing:24px 0;margin-top:40px;">
       <tr>
-        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10.5px;text-align:center;">Assinatura do Responsável pela Conclusão</td>
-        <td style="width:50%;"></td>
-        <td style="width:50%;padding-top:24px;border-top:1px solid #0f172a;font-size:10.5px;text-align:center;">Assinatura da Liderança</td>
+        <td style="width:50%;padding-top:55px;border-top:1px solid #0f172a;font-size:10.5px;text-align:center;">Assinatura do Responsável pela Conclusão</td>
+        <td style="width:50%;padding-top:55px;border-top:1px solid #0f172a;font-size:10.5px;text-align:center;">Assinatura da Liderança</td>
       </tr>
-      <tr><td style="padding-top:6px;font-size:9.5px;text-align:center;color:#475569;">Data: ____/____/______</td><td></td><td style="padding-top:6px;font-size:9.5px;text-align:center;color:#475569;">Data: ____/____/______</td></tr>
+      <tr>
+        <td style="padding-top:6px;font-size:9.5px;text-align:center;color:#475569;">Data: ____/____/______</td>
+        <td style="padding-top:6px;font-size:9.5px;text-align:center;color:#475569;">Data: ____/____/______</td>
+      </tr>
     </table>
   </div>`;
 }
