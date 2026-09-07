@@ -2482,7 +2482,7 @@ function celPdf(label, valor, largura){
   </td>`;
 }
 function tituloPdf(txt){
-  return `<tr><td colspan="12" style="background:#1f2937;color:#fff;font-weight:bold;font-size:10.5px;padding:5px 8px;">${txt}</td></tr>`;
+  return `<tr><td colspan="12" style="background:#d9d9d9;color:#000;font-weight:bold;font-size:12px;padding:6px 8px;border:1px solid #94a3b8;">${txt}</td></tr>`;
 }
 function tabelaPdf(titulo, cols, linhas){
   const linhasComDado = linhas.filter(l=>Object.values(l).some(v=>v));
@@ -2490,7 +2490,7 @@ function tabelaPdf(titulo, cols, linhas){
   return `
   <table style="width:100%;border-collapse:collapse;margin-top:6px;margin-bottom:10px;">
     <thead>
-      <tr>${cols.map(c=>`<th style="border:1px solid #94a3b8;background:#e2e8f0;font-size:8.5px;padding:3px 5px;text-align:left;">${c.label}</th>`).join('')}</tr>
+      <tr>${cols.map(c=>`<th style="border:1px solid #94a3b8;background:#d9d9d9;color:#000;font-size:9px;font-weight:bold;padding:4px 5px;text-align:left;">${c.label}</th>`).join('')}</tr>
     </thead>
     <tbody>
       ${linhasFinal.map(l=>`<tr>${cols.map(c=>`<td style="border:1px solid #94a3b8;padding:3px 5px;font-size:9px;min-height:16px;">${(l[c.key]||'').toString().replace(/</g,'&lt;')||'&nbsp;'}</td>`).join('')}</tr>`).join('')}
@@ -2531,7 +2531,7 @@ function htmlRelatorioAnomaliaPdf(r, k){
     ${tabelaPdf('Ações de Verificação da Causa Raiz', CAUSA_RAIZ_COLS, cr)}
 
     <table style="width:100%;border-collapse:collapse;">
-      <tr><td colspan="12" style="border:1px solid #94a3b8;padding:5px 8px;font-size:8.5px;font-weight:bold;color:#475569;text-transform:uppercase;">Checklist de Padronização e Gestão do Conhecimento</td></tr>
+      <tr><td colspan="12" style="background:#d9d9d9;color:#000;font-weight:bold;font-size:11px;padding:5px 8px;border:1px solid #94a3b8;">Checklist de Padronização e Gestão do Conhecimento</td></tr>
       <tr>${celPdf('Mapeamento de Processo precisa atualizar?', r.chkMapeamentoProcesso)}${celPdf('É necessário fazer DTO?', r.chkDto)}${celPdf('É necessário atualizar o padrão?', r.chkPadrao)}${celPdf('Necessário treinamento/comunicação?', r.chkTreinamento)}${celPdf('Necessário monitoramento de IV?', r.chkMonitoramentoIv)}<td style="border:1px solid #94a3b8;"></td></tr>
       ${tituloPdf('PREVENÇÃO — Plano de Ação')}
     </table>
