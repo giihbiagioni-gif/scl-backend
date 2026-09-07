@@ -1860,9 +1860,23 @@ function renderRecordsView(type){
     </div>
 
     ${type==='planos' ? `
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
       <div class="flex flex-wrap gap-2" id="kpiFilterChipsPlanos"></div>
       <button id="limparFiltroKpiPlanosBtn" class="text-[11px] text-slate-400 hover:text-slate-200 underline whitespace-nowrap">Limpar seleção</button>
+    </div>
+    <div class="flex flex-wrap gap-3 mb-4">
+      <div class="bg-[#0b1220] border border-slate-800 rounded-lg px-4 py-2">
+        <p class="text-[9px] text-slate-500 font-semibold">TOTAL</p>
+        <p class="text-lg font-bold text-slate-100">${rows.length}</p>
+      </div>
+      <div class="bg-[#0b1220] border border-slate-800 rounded-lg px-4 py-2">
+        <p class="text-[9px] text-slate-500 font-semibold">CONCLUÍDOS</p>
+        <p class="text-lg font-bold text-emerald-400">${rows.filter(r=>r.status==='Concluído').length}</p>
+      </div>
+      <div class="bg-[#0b1220] border border-slate-800 rounded-lg px-4 py-2">
+        <p class="text-[9px] text-slate-500 font-semibold">PENDENTES</p>
+        <p class="text-lg font-bold text-amber-400">${rows.filter(r=>r.status!=='Concluído').length}</p>
+      </div>
     </div>` : ''}
 
     <div id="recordFormArea-${type}"></div>
