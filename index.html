@@ -1523,7 +1523,7 @@ const CSV_EDITAVEL_HEADER = ['kpi_cod','kpi_nome','mes_idx','mes','meta_rs','rea
 function csvNum(v){ return (v===null || v===undefined || v==='') ? '' : v; }
 
 function exportEditableCSV(){
-  const linhas = [CSV_EDITAVEL_HEADER.join(',')];
+  const linhas = [CSV_EDITAVEL_HEADER.join(';')];
   DATA.kpis.forEach(k=>{
     DATA.months.forEach((mes,i)=>{
       linhas.push([
@@ -1533,7 +1533,7 @@ function exportEditableCSV(){
         csvNum(k.hl_meta_mensal?.[i]), csvNum(k.hl_real_mensal?.[i]),
         csvNum(k.wqi_meta_mensal?.[i]), csvNum(k.wqi_real_mensal?.[i]),
         csvNum(k.gatilho)
-      ].join(','));
+      ].join(';'));
     });
   });
   const blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
