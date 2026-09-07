@@ -2376,6 +2376,23 @@ function renderRecordsView(type){
         if(!tabelas[nomeTabela][idx]) tabelas[nomeTabela][idx] = {};
         tabelas[nomeTabela][idx][col] = campo.value;
       });
+      // se for um relato de anomalia, toda linha da Causa Raiz com "Ação" preenchida
+      // é copiada automaticamente pra linha correspondente do Plano de Prevenção, se ela ainda estiver vazia
+      if(t==='anomalias' && tabelas.causaRaizAcoes){
+        if(!tabelas.planoPrevencao) tabelas.planoPrevencao = [];
+        tabelas.causaRaizAcoes.forEach((linhaCausa, idx)=>{
+          if(!linhaCausa || !linhaCausa.acao || !linhaCausa.acao.trim()) return;
+          if(!tabelas.planoPrevencao[idx]) tabelas.planoPrevencao[idx] = {data:'',topico:'',acao:'',comentarios:'',responsavel:'',dataLimite:'',status:''};
+          const linhaPrev = tabelas.planoPrevencao[idx];
+          if(!linhaPrev.acao || !linhaPrev.acao.trim()){
+            linhaPrev.acao = linhaCausa.acao;
+            linhaPrev.responsavel = linhaPrev.responsavel || linhaCausa.responsavel || '';
+            linhaPrev.dataLimite = linhaPrev.dataLimite || linhaCausa.dataLimite || '';
+            linhaPrev.status = linhaPrev.status || linhaCausa.status || '';
+            linhaPrev.topico = linhaPrev.topico || linhaCausa.categoria || '';
+          }
+        });
+      }
       Object.keys(tabelas).forEach(nomeTabela=>{ rec[nomeTabela] = tabelas[nomeTabela]; });
       await addRecordToStorage(t, rec);
       recordEditando[t].delete(id);
