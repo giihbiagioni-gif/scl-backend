@@ -2212,6 +2212,11 @@ function renderRecordsView(type){
       Object.keys(tabelas).forEach(nomeTabela=>{ rec[nomeTabela] = tabelas[nomeTabela]; });
       await addRecordToStorage(t, rec);
       recordEditando[t].delete(id);
+
+      if(t==='anomalias'){
+        await perguntarSubirPlanosTracados(rec);
+      }
+
       renderRecordsView(t);
       renderTabBar();
     });
@@ -3593,6 +3598,50 @@ async function addRecordToStorage(type, record){
 }
 
 // remove um registro: apaga a chave dele + atualiza o índice
+// pergunta (sim/não) se os planos traçados na tabela de Prevenção do relato devem virar
+// registros de verdade na aba de Planos de Ação — chamado toda vez que um relato é salvo
+async function perguntarSubirPlanosTracados(rec){
+  const linhasComAcao = (rec.planoPrevencao || [])
+    .map((linha, idx) => ({linha, idx}))
+    .filter(({linha}) => linha.acao && linha.acao.trim());
+
+  if(linhasComAcao.length === 0) return;
+
+  const confirmar = confirm(
+    `Foram encontrados ${linhasComAcao.length} plano(s) traçado(s) na tabela de Prevenção deste relato.\n\n` +
+    `Deseja subir ${linhasComAcao.length>1 ? 'esses planos' : 'esse plano'} para a aba de Planos de Ação?`
+  );
+  if(!confirmar) return;
+
+  let criados = 0, atualizados = 0;
+  for(const {linha, idx} of linhasComAcao){
+    let plano = records.planos.find(p => p.anomaliaRef === rec.id && p.anomaliaLinhaIdx === idx);
+    if(plano){
+      plano.desc = linha.acao;
+      plano.resp = linha.responsavel || rec.resp || '';
+      plano.data = linha.dataLimite || rec.data || null;
+      plano.status = linha.status || plano.status || 'Pendente';
+      plano.comentario = linha.comentarios || plano.comentario || '';
+      atualizados++;
+    } else {
+      plano = {
+        id: nextRecordId++,
+        kpiCod: rec.kpiCod, mes: rec.mes, desc: linha.acao,
+        resp: linha.responsavel || rec.resp || '',
+        data: linha.dataLimite || rec.data || null,
+        dataCriacao: rec.dataCriacao || null, dataConclusao: null,
+        status: linha.status || 'Pendente',
+        img: null, evidenciaSugerida: false, comentario: linha.comentarios || '',
+        anomaliaRef: rec.id, anomaliaLinhaIdx: idx
+      };
+      records.planos.push(plano);
+      criados++;
+    }
+    await addRecordToStorage('planos', plano);
+  }
+  alert(`Pronto! ${criados} plano(s) novo(s) e ${atualizados} atualizado(s) na aba de Planos de Ação.`);
+}
+
 async function deleteRecordFromStorage(type, id){
   if(!hasPersistentStorage) return;
   try{
