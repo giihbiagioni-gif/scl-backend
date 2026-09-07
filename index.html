@@ -2608,19 +2608,23 @@ async function gerarPdfAnomalia(r, k){
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4', true);
     const pageWidth = 210, pageHeight = 297;
-    const imgWidth = pageWidth;
-    const imgHeight = canvas.height * imgWidth / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-    const imgData = canvas.toDataURL('image/png');
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-    while(heightLeft > 0){
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
+    const margem = 6; // margem de segurança pra não colar nas bordas da página
+    const areaW = pageWidth - margem*2, areaH = pageHeight - margem*2;
+
+    let imgWidth = areaW;
+    let imgHeight = canvas.height * imgWidth / canvas.width;
+
+    // trava: sempre sai numa página só — se não couber na altura, encolhe proporcionalmente
+    if(imgHeight > areaH){
+      const fator = areaH / imgHeight;
+      imgHeight = areaH;
+      imgWidth = imgWidth * fator;
     }
+
+    const offsetX = (pageWidth - imgWidth) / 2;
+    const offsetY = margem;
+    const imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight, undefined, 'FAST');
     pdf.save(`Relato_Anomalia_${r.numeroRegistro||r.id}.pdf`);
   }catch(e){
     console.error(e);
