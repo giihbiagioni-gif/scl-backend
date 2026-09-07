@@ -775,7 +775,7 @@ function renderTree(){
   function valueBox(meta, real, fmt, varPct, monthsCod, ytd){
     const s = varPct==null ? {bg:"bg-slate-600", text:"text-slate-500", chip:"rgba(100,116,139,.15)"} : statusColor(varPct);
     const clickable = monthsCod!=null;
-    const ytdS = (ytd && ytd.varPct!=null) ? statusColor(ytd.varPct) : null;
+    const ytdS = (ytd && ytd.varPct!=null && mostrarComparativoAnoAnterior) ? statusColor(ytd.varPct) : null;
     return `
     <div class="flex items-center gap-0 fade-in">
       <svg class="w-4 h-6 flex-shrink-0 text-slate-700" viewBox="0 0 16 24"><path d="M0 12 H16" stroke="currentColor" fill="none" stroke-width="1.5"/></svg>
@@ -914,6 +914,7 @@ function renderTree(){
 
   // linha fixa com o comparativo YTD 2025 x 2026 (mesmo período filtrado) — genérica pra qualquer unidade
   function ytdLineUnit(k, unit, label, ic){
+    if(!mostrarComparativoAnoAnterior) return '';
     const {varPct} = kpiYtdCompare(k, unit);
     if(varPct==null) return '';
     const s = statusColor(varPct);
