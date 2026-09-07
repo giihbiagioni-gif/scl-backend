@@ -2169,6 +2169,17 @@ function renderRecordsView(type){
         if((nome==='data' || nome==='dataCriacao' || nome==='dataConclusao') && !valor) valor = null;
         rec[nome] = valor;
       });
+      // recolhe as tabelas editáveis (ex: causaRaizAcoes, planoPrevencao) em arrays de objetos
+      const tabelas = {};
+      card.querySelectorAll('[data-table-field]').forEach(campo=>{
+        const nomeTabela = campo.dataset.tableField;
+        const idx = parseInt(campo.dataset.tableIdx);
+        const col = campo.dataset.tableCol;
+        if(!tabelas[nomeTabela]) tabelas[nomeTabela] = [];
+        if(!tabelas[nomeTabela][idx]) tabelas[nomeTabela][idx] = {};
+        tabelas[nomeTabela][idx][col] = campo.value;
+      });
+      Object.keys(tabelas).forEach(nomeTabela=>{ rec[nomeTabela] = tabelas[nomeTabela]; });
       await addRecordToStorage(t, rec);
       recordEditando[t].delete(id);
       renderRecordsView(t);
@@ -2251,9 +2262,265 @@ function recordRow(r, type, meta){
   return row;
 }
 
+// ===================== RELATO DE ANOMALIA (RCA completo, fiel ao modelo) =====================
+const CAUSA_RAIZ_COLS = [
+  {key:'categoria', label:'Categoria'},
+  {key:'causaPotencial', label:'Causa Potencial'},
+  {key:'acao', label:'Ação'},
+  {key:'responsavel', label:'Responsável'},
+  {key:'dataLimite', label:'Data Limite', tipo:'date'},
+  {key:'status', label:'Status'},
+  {key:'possivelCausaRaiz', label:'Possível Causa Raiz?'}
+];
+const PREVENCAO_COLS = [
+  {key:'data', label:'Data', tipo:'date'},
+  {key:'topico', label:'Tópico'},
+  {key:'acao', label:'Ação'},
+  {key:'comentarios', label:'Comentários'},
+  {key:'responsavel', label:'Responsável'},
+  {key:'dataLimite', label:'Data Limite', tipo:'date'},
+  {key:'status', label:'Status'}
+];
+function novaAnomaliaBase(){
+  return {
+    cdd:'', dataAnomalia:'', turnoEquipe:'', iniciadoPor:'', responsavelConclusao:'',
+    departamento:'', area:'', gatilhoTexto:'', equipamentoAfetado:'', numeroRegistro:'',
+    tempoInatividadeValor:'', tempoInatividadeUnidade:'', perdasValor:'', perdasUnidade:'R$',
+    produtosNaoConformesValor:'', produtosNaoConformesUnidade:'',
+    acoesBloqueio:'', observacoes:'',
+    outroRelato:'Não', quemConduzAnalise:'',
+    causaRaizAcoes: Array.from({length:7}, ()=>({categoria:'',causaPotencial:'',acao:'',responsavel:'',dataLimite:'',status:'',possivelCausaRaiz:''})),
+    chkMapeamentoProcesso:'Não', chkDto:'Não', chkPadrao:'Não', chkTreinamento:'Não', chkMonitoramentoIv:'Não',
+    planoPrevencao: Array.from({length:8}, ()=>({data:'',topico:'',acao:'',comentarios:'',responsavel:'',dataLimite:'',status:''})),
+    resolveuCausaRaiz:'', escalarZona:'Não', escalarCapex:'Não', enviouInovacao:'Não'
+  };
+}
+function boxInfo(label, valor){
+  return `<div class="bg-[#111827] rounded-lg p-2">
+    <p class="text-[9px] text-slate-500 font-semibold">${label}</p>
+    <p class="text-xs font-semibold text-slate-200">${valor || '—'}</p>
+  </div>`;
+}
+function tituloSecaoRCA(txt){
+  return `<p class="text-[11px] font-bold text-blue-400 uppercase tracking-wide border-b border-slate-800 pb-1 mt-4 first:mt-0">${txt}</p>`;
+}
+
+function anomaliaFormView(r, k){
+  const cr = r.causaRaizAcoes || [];
+  const pv = r.planoPrevencao || [];
+  return `
+  <div class="space-y-3">
+    <div class="flex items-start justify-between gap-2">
+      <div>
+        <p class="text-[10px] font-semibold text-slate-500 mb-1">DESCRIÇÃO DA ANOMALIA</p>
+        <p class="text-xs text-slate-200">${r.desc||'—'}</p>
+      </div>
+      <button data-edit-record="${r.id}" data-edit-type="anomalias" class="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-blue-400 transition">
+        ${icon('edit','w-3.5 h-3.5')} Editar
+      </button>
+    </div>
+
+    ${tituloSecaoRCA('Reação — completar em 24h do evento')}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      ${boxInfo('CÓDIGO', '#'+r.id)}
+      ${boxInfo('KPI', k?k.nome:'—')}
+      ${r.colaborador ? boxInfo('COLABORADOR', r.colaborador) : ''}
+      ${r.planoRef ? boxInfo('PLANO DE ORIGEM', '#'+r.planoRef) : ''}
+      ${boxInfo('CDD', r.cdd)}
+      ${boxInfo('DATA DA ANOMALIA', r.dataAnomalia)}
+      ${boxInfo('TURNO / EQUIPE', r.turnoEquipe)}
+      ${boxInfo('INICIADO POR', r.iniciadoPor)}
+      ${boxInfo('RESPONSÁVEL PELA CONCLUSÃO', r.responsavelConclusao)}
+      ${boxInfo('STATUS', r.status)}
+      ${boxInfo('DEPARTAMENTO', r.departamento)}
+      ${boxInfo('ÁREA', r.area)}
+      ${boxInfo('GATILHO', r.gatilhoTexto)}
+      ${boxInfo('EQUIPAMENTO AFETADO', r.equipamentoAfetado)}
+      ${boxInfo('Nº DE REGISTRO', r.numeroRegistro)}
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+      ${boxInfo('TEMPO DE INATIVIDADE', [r.tempoInatividadeValor, r.tempoInatividadeUnidade].filter(Boolean).join(' '))}
+      ${boxInfo('PERDAS', [r.perdasUnidade, r.perdasValor].filter(Boolean).join(' '))}
+      ${boxInfo('PRODUTOS NÃO-CONFORMES', [r.produtosNaoConformesValor, r.produtosNaoConformesUnidade].filter(Boolean).join(' '))}
+    </div>
+
+    <div>
+      <p class="text-[10px] font-semibold text-slate-500 mb-1">AÇÕES DE BLOQUEIO DO EFEITO (CORRETIVAS IMEDIATAS)</p>
+      <p class="text-xs text-slate-200 bg-[#111827] rounded-lg p-2">${r.acoesBloqueio || '—'}</p>
+    </div>
+    <div>
+      <p class="text-[10px] font-semibold text-slate-500 mb-1">OBSERVAÇÕES</p>
+      <p class="text-xs text-slate-200 bg-[#111827] rounded-lg p-2">${r.observacoes || '—'}</p>
+    </div>
+
+    ${tituloSecaoRCA('Análise da Causa Raiz — completar em 5 dias úteis')}
+    <div class="grid grid-cols-2 gap-2">
+      ${boxInfo('HÁ OUTRO RELATO PRO MESMO PROBLEMA?', r.outroRelato)}
+      ${boxInfo('QUEM ESTÁ CONDUZINDO A ANÁLISE', r.quemConduzAnalise)}
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-[10px] border-collapse mt-1">
+        <thead><tr class="text-slate-500 border-b border-slate-800">${CAUSA_RAIZ_COLS.map(c=>`<th class="py-1 pr-2 text-left font-semibold">${c.label}</th>`).join('')}</tr></thead>
+        <tbody>${cr.filter(row=>Object.values(row).some(v=>v)).map(row=>`<tr class="border-b border-slate-800/50">${CAUSA_RAIZ_COLS.map(c=>`<td class="py-1 pr-2 text-slate-300">${row[c.key]||'—'}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${CAUSA_RAIZ_COLS.length}" class="py-2 text-slate-600">Nenhuma ação registrada.</td></tr>`}</tbody>
+      </table>
+    </div>
+
+    <div>
+      <p class="text-[10px] font-semibold text-slate-500 mb-1">CHECKLIST DE PADRONIZAÇÃO</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        ${boxInfo('Mapeamento de Processo?', r.chkMapeamentoProcesso)}
+        ${boxInfo('Necessário DTO?', r.chkDto)}
+        ${boxInfo('Atualizar padrão?', r.chkPadrao)}
+        ${boxInfo('Treinamento/comunicação?', r.chkTreinamento)}
+        ${boxInfo('Monitoramento de IV?', r.chkMonitoramentoIv)}
+      </div>
+    </div>
+
+    ${tituloSecaoRCA('Prevenção — Plano de Ação')}
+    <div class="overflow-x-auto">
+      <table class="w-full text-[10px] border-collapse mt-1">
+        <thead><tr class="text-slate-500 border-b border-slate-800">${PREVENCAO_COLS.map(c=>`<th class="py-1 pr-2 text-left font-semibold">${c.label}</th>`).join('')}</tr></thead>
+        <tbody>${pv.filter(row=>Object.values(row).some(v=>v)).map(row=>`<tr class="border-b border-slate-800/50">${PREVENCAO_COLS.map(c=>`<td class="py-1 pr-2 text-slate-300">${row[c.key]||'—'}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${PREVENCAO_COLS.length}" class="py-2 text-slate-600">Nenhuma ação registrada.</td></tr>`}</tbody>
+      </table>
+    </div>
+
+    ${tituloSecaoRCA('Encerramento do Reporte')}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      ${boxInfo('Ações resolveram a causa raiz?', r.resolveuCausaRaiz)}
+      ${boxInfo('Escalar pra zona?', r.escalarZona)}
+      ${boxInfo('Escalar CAPEX?', r.escalarCapex)}
+      ${boxInfo('Enviou inovação/GOP?', r.enviouInovacao)}
+      ${boxInfo('Data de Conclusão', r.dataConclusao)}
+    </div>
+
+    <div>
+      <p class="text-[10px] font-semibold text-slate-500 mb-1">COMENTÁRIOS</p>
+      <textarea data-record-comment="${r.id}" rows="2" placeholder="Adicione um comentário sobre esse registro..."
+        class="w-full bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600 resize-none">${r.comentario||''}</textarea>
+    </div>
+    <div>
+      <p class="text-[10px] font-semibold text-slate-500 mb-1">EVIDÊNCIA</p>
+      ${r.img ? `
+      <button data-open-img="${r.id}" class="block w-full max-w-xs">
+        <img src="${r.img}" class="w-full h-40 object-cover rounded-lg border border-slate-700 hover:border-blue-500 transition"/>
+      </button>
+      <button data-record-attach="${r.id}" class="mt-2 max-w-xs text-[11px] font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg py-1.5 px-3 transition">Trocar foto</button>
+      ` : `
+      <button data-record-attach="${r.id}" class="w-full max-w-xs h-28 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-lg text-slate-500 hover:text-blue-400 transition">
+        ${icon('broken','w-6 h-6')}
+        <span class="text-[11px] font-semibold">Anexar evidência</span>
+      </button>`}
+    </div>
+  </div>`;
+}
+
+function campoTexto(label, key, valor, tipo){
+  tipo = tipo || 'text';
+  if(tipo==='textarea'){
+    return `<div class="md:col-span-2"><label class="text-[10px] font-semibold text-slate-500">${label}</label>
+      <textarea data-edit-field="${key}" rows="2" class="w-full mt-1 bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 resize-none">${valor||''}</textarea></div>`;
+  }
+  if(tipo==='select-sim-nao'){
+    return `<div><label class="text-[10px] font-semibold text-slate-500">${label}</label>
+      <select data-edit-field="${key}" class="w-full mt-1 bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="Sim" ${valor==='Sim'?'selected':''}>Sim</option>
+        <option value="Não" ${valor==='Não'?'selected':''}>Não</option>
+      </select></div>`;
+  }
+  return `<div><label class="text-[10px] font-semibold text-slate-500">${label}</label>
+    <input data-edit-field="${key}" type="${tipo}" value="${(valor||'').toString().replace(/"/g,'&quot;')}" class="w-full mt-1 bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-blue-500" /></div>`;
+}
+
+function tabelaEditavel(titulo, cols, linhas, campoNome){
+  return `
+  <div>
+    <p class="text-[10px] font-semibold text-slate-500 mb-1">${titulo}</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-[10px] border-collapse">
+        <thead><tr class="text-slate-500">${cols.map(c=>`<th class="py-1 pr-1 text-left font-semibold">${c.label}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${linhas.map((linha,i)=>`<tr>${cols.map(c=>`<td class="py-0.5 pr-1"><input data-table-field="${campoNome}" data-table-idx="${i}" data-table-col="${c.key}" type="${c.tipo==='date'?'date':'text'}" value="${(linha[c.key]||'').toString().replace(/"/g,'&quot;')}" class="w-full bg-[#111827] border border-slate-700 rounded px-1.5 py-1 text-[10px] text-slate-200 outline-none focus:ring-1 focus:ring-blue-500" /></td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function anomaliaFormEdit(r){
+  const cr = (r.causaRaizAcoes && r.causaRaizAcoes.length) ? r.causaRaizAcoes : novaAnomaliaBase().causaRaizAcoes;
+  const pv = (r.planoPrevencao && r.planoPrevencao.length) ? r.planoPrevencao : novaAnomaliaBase().planoPrevencao;
+  return `
+  <div class="space-y-3">
+    ${tituloSecaoRCA('Reação')}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="md:col-span-2"><label class="text-[10px] font-semibold text-slate-500">Descrição da Anomalia</label>
+        <textarea data-edit-field="desc" rows="2" class="w-full mt-1 bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 resize-none">${r.desc||''}</textarea></div>
+      ${campoTexto('CDD','cdd',r.cdd)}
+      ${campoTexto('Data da Anomalia','dataAnomalia',r.dataAnomalia,'date')}
+      ${campoTexto('Turno / Equipe','turnoEquipe',r.turnoEquipe)}
+      ${campoTexto('Iniciado Por','iniciadoPor',r.iniciadoPor)}
+      ${campoTexto('Responsável pela Conclusão','responsavelConclusao',r.responsavelConclusao)}
+      <div><label class="text-[10px] font-semibold text-slate-500">Status</label>
+        <select data-edit-field="status" class="w-full mt-1 bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="Iniciado" ${r.status==='Iniciado'?'selected':''}>Iniciado</option>
+          <option value="Em andamento" ${r.status==='Em andamento'?'selected':''}>Em andamento</option>
+          <option value="Concluído" ${r.status==='Concluído'?'selected':''}>Concluído</option>
+        </select></div>
+      ${campoTexto('Departamento','departamento',r.departamento)}
+      ${campoTexto('Área','area',r.area)}
+      ${campoTexto('Gatilho','gatilhoTexto',r.gatilhoTexto)}
+      ${campoTexto('Equipamento Afetado','equipamentoAfetado',r.equipamentoAfetado)}
+      ${campoTexto('Número de Registro','numeroRegistro',r.numeroRegistro)}
+      ${campoTexto('Tempo de Inatividade (valor)','tempoInatividadeValor',r.tempoInatividadeValor)}
+      ${campoTexto('Unidade do Tempo de Inatividade','tempoInatividadeUnidade',r.tempoInatividadeUnidade)}
+      ${campoTexto('Perdas (valor)','perdasValor',r.perdasValor)}
+      ${campoTexto('Unidade da Perda','perdasUnidade',r.perdasUnidade)}
+      ${campoTexto('Produtos não-conformes (valor)','produtosNaoConformesValor',r.produtosNaoConformesValor)}
+      ${campoTexto('Unidade de produtos não conformes','produtosNaoConformesUnidade',r.produtosNaoConformesUnidade)}
+      ${campoTexto('Ações de Bloqueio do Efeito','acoesBloqueio',r.acoesBloqueio,'textarea')}
+      ${campoTexto('Observações','observacoes',r.observacoes,'textarea')}
+    </div>
+
+    ${tituloSecaoRCA('Análise da Causa Raiz')}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      ${campoTexto('Há outro relato pro mesmo problema?','outroRelato',r.outroRelato,'select-sim-nao')}
+      ${campoTexto('Quem está conduzindo a análise','quemConduzAnalise',r.quemConduzAnalise)}
+    </div>
+    ${tabelaEditavel('Ações de Verificação da Causa Raiz', CAUSA_RAIZ_COLS, cr, 'causaRaizAcoes')}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      ${campoTexto('Mapeamento de Processo precisa atualizar?','chkMapeamentoProcesso',r.chkMapeamentoProcesso,'select-sim-nao')}
+      ${campoTexto('É necessário fazer DTO?','chkDto',r.chkDto,'select-sim-nao')}
+      ${campoTexto('É necessário atualizar o padrão?','chkPadrao',r.chkPadrao,'select-sim-nao')}
+      ${campoTexto('Necessário treinamento/comunicação?','chkTreinamento',r.chkTreinamento,'select-sim-nao')}
+      ${campoTexto('Necessário monitoramento de IV?','chkMonitoramentoIv',r.chkMonitoramentoIv,'select-sim-nao')}
+    </div>
+
+    ${tituloSecaoRCA('Prevenção — Plano de Ação')}
+    ${tabelaEditavel('Plano de Ação', PREVENCAO_COLS, pv, 'planoPrevencao')}
+
+    ${tituloSecaoRCA('Encerramento do Reporte')}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      ${campoTexto('Ações corretivas resolveram a causa raiz?','resolveuCausaRaiz',r.resolveuCausaRaiz,'select-sim-nao')}
+      ${campoTexto('É necessário escalar para a zona?','escalarZona',r.escalarZona,'select-sim-nao')}
+      ${campoTexto('É necessário escalar CAPEX?','escalarCapex',r.escalarCapex,'select-sim-nao')}
+      ${campoTexto('Enviou inovação/melhor prática/GOP?','enviouInovacao',r.enviouInovacao,'select-sim-nao')}
+      ${campoTexto('Data de Conclusão','dataConclusao',r.dataConclusao,'date')}
+    </div>
+
+    <div class="flex items-center gap-2 pt-2">
+      <button data-save-edit="${r.id}" data-save-type="anomalias" class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 transition text-white text-xs font-semibold px-4 py-2 rounded-lg">Salvar alterações</button>
+      <button data-cancel-edit="${r.id}" data-cancel-type="anomalias" class="text-xs font-medium text-slate-400 hover:text-slate-200 px-3 py-2">Cancelar</button>
+    </div>
+  </div>`;
+}
+
 function recordDetail(r, type, meta){
   const k = kpiByCod(r.kpiCod);
   const editando = recordEditando[type].has(r.id);
+
+  if(type==='anomalias') return editando ? anomaliaFormEdit(r) : anomaliaFormView(r, k);
 
   if(editando){
     return `
