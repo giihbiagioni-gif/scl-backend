@@ -149,6 +149,20 @@
     </div>
   </section>
 
+  <!-- ==================== CHARTS ROW 3 — WQI e FGLI ==================== -->
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
+      <h3 class="text-sm font-bold text-slate-200 mb-1">Desempenho WQI — Quebra PA</h3>
+      <p class="text-xs text-slate-500 mb-3">Meta vs Real, mês a mês</p>
+      <div class="h-72"><canvas id="wqiChart"></canvas></div>
+    </div>
+    <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
+      <h3 class="text-sm font-bold text-slate-200 mb-1">Desempenho FGLI (hL)</h3>
+      <p class="text-xs text-slate-500 mb-3">Soma dos KPIs selecionados com dado de FGLI, mês a mês</p>
+      <div class="h-72"><canvas id="fgliChart"></canvas></div>
+    </div>
+  </section>
+
   <!-- ==================== DESEMPENHO POR KPI (MÊS A MÊS, 2025 x 2026) ==================== -->
   <section class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
     <h3 class="text-sm font-bold text-slate-200 mb-1 flex items-center gap-2">
@@ -1086,7 +1100,7 @@ const SERIES_COLORS = {
 
 function renderCharts(){
   if (typeof Chart === 'undefined') {
-    ['lineChart','pieChart','barChart','volumeChart'].forEach(id=>{
+    ['lineChart','pieChart','barChart','volumeChart','wqiChart','fgliChart'].forEach(id=>{
       const canvas = document.getElementById(id);
       if(canvas && canvas.parentElement){
         canvas.parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-500">Não foi possível carregar a biblioteca de gráficos (Chart.js). Os demais dados do dashboard continuam disponíveis.</div>';
@@ -1158,6 +1172,39 @@ function renderCharts(){
   });
 
   renderKpiPerfCharts(kpis, monthsLbl, idxRange);
+
+  // WQI CHART — hoje só a Quebra PA tem esse dado; média entre os KPIs selecionados que têm WQI
+  const kpisComWqi = kpis.filter(k=>k.wqi_meta_mensal!=null);
+  if(kpisComWqi.length===0){
+    document.getElementById('wqiChart').parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-500 text-center px-4">Nenhum KPI selecionado tem dado de WQI (hoje só a Quebra PA tem esse indicador).</div>';
+  } else {
+    const wqiMetaByMonth = idxRange.map(i => kpisComWqi.reduce((s,k)=>s+(k.wqi_meta_mensal[i]!=null?k.wqi_meta_mensal[i]:0),0)/kpisComWqi.length);
+    const wqiRealByMonth = idxRange.map(i => kpisComWqi.reduce((s,k)=>s+(k.wqi_real_mensal[i]!=null?k.wqi_real_mensal[i]:0),0)/kpisComWqi.length);
+    charts.wqi = new Chart(document.getElementById('wqiChart'), {
+      type:'line',
+      data:{ labels: monthsLbl, datasets:[
+        {label:'Meta WQI', data:wqiMetaByMonth, borderColor:SERIES_COLORS.meta, backgroundColor:SERIES_COLORS.meta+'22', borderDash:[5,4], tension:.3, pointRadius:4, fill:false},
+        {label:'Real WQI', data:wqiRealByMonth, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:4, fill:true, pointBackgroundColor:SERIES_COLORS.ano2026}
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)}} },
+        scales:{ y:{ticks:{callback:v=>fmtNum(v), color:TICK_COLOR}, grid:{color:GRID_COLOR}}, x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
+    });
+  }
+
+  // FGLI CHART — soma dos KPIs selecionados que têm dado de FGLI
+  const fgliMetaByMonth = idxRange.map(i => kpis.reduce((s,k)=>s+((k.fgli_meta_mensal && k.fgli_meta_mensal[i]!=null)?k.fgli_meta_mensal[i]:0),0));
+  const fgliRealByMonth = idxRange.map(i => kpis.reduce((s,k)=>s+((k.fgli_real_mensal && k.fgli_real_mensal[i]!=null)?k.fgli_real_mensal[i]:0),0));
+  charts.fgli = new Chart(document.getElementById('fgliChart'), {
+    type:'line',
+    data:{ labels: monthsLbl, datasets:[
+      {label:'Meta FGLI (hL)', data:fgliMetaByMonth, borderColor:SERIES_COLORS.meta, backgroundColor:SERIES_COLORS.meta+'22', borderDash:[5,4], tension:.3, pointRadius:4, fill:false},
+      {label:'Real FGLI (hL)', data:fgliRealByMonth, borderColor:SERIES_COLORS.rsPorHl, backgroundColor:SERIES_COLORS.rsPorHl+'2a', tension:.3, pointRadius:4, fill:true, pointBackgroundColor:SERIES_COLORS.rsPorHl}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' hL'}} },
+      scales:{ y:{ticks:{callback:v=>fmtNum(v), color:TICK_COLOR}, grid:{color:GRID_COLOR}}, x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
+  });
 }
 
 // um gráfico por KPI: Meta 2026 x Real 2026 x Real 2025, mês a mês
