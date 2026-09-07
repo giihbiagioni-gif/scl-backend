@@ -1417,7 +1417,7 @@ function renderKpiPerfCharts(kpis, monthsLbl, idxRange){
       <h4 class="text-xs font-bold mb-1 flex items-center gap-2" style="color:${k.cor}">
         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${k.cor}"></span>${k.nome}
       </h4>
-      <p class="text-[10px] text-slate-500 mb-2">Meta 2026 x Real 2026 x Real 2025 x Preço Mercado</p>
+      <p class="text-[10px] text-slate-500 mb-2">Meta 2026 x Real 2026 x Real 2025${mostrarPrecoMercado ? ' x Preço Mercado' : ''}${mostrarRsHlPorIndicador ? ' x R$/HL' : ''}</p>
       <div class="h-56"><canvas id="kpiPerfChart_${k.cod}"></canvas></div>
     </div>`).join('');
 
@@ -1427,19 +1427,22 @@ function renderKpiPerfCharts(kpis, monthsLbl, idxRange){
     const real2026Data = idxRange.map(i=>k.real_mensal[i]);
     const real2025Data = idxRange.map(i=>k.real_2025_mensal ? k.real_2025_mensal[i] : null);
     const priceIndexData = idxRange.map(i=>PRICE_INDEX.avg[i]);
+    const rsHlKpiData = idxRange.map(i=>DATA.volume.real[i] ? ((k.real_mensal[i]||0)/DATA.volume.real[i]) : null);
     charts.kpiPerf[k.cod] = new Chart(document.getElementById(`kpiPerfChart_${k.cod}`), {
       type:'line',
       data:{ labels: monthsLbl, datasets:[
         {label:'Meta 2026', data:metaData, borderColor:SERIES_COLORS.meta, backgroundColor:SERIES_COLORS.meta+'22', borderDash:[5,4], tension:.3, pointRadius:3, fill:false, yAxisID:'y'},
         {label:'Real 2026', data:real2026Data, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:3, fill:true, yAxisID:'y'},
         {label:'Real 2025', data:real2025Data, borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false, yAxisID:'y'},
-        ...(mostrarPrecoMercado ? [{label:'Preço Mercado', data:priceIndexData, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[3,2], tension:.3, pointRadius:2, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'}] : [])
+        ...(mostrarPrecoMercado ? [{label:'Preço Mercado', data:priceIndexData, borderColor:SERIES_COLORS.precoMercado, backgroundColor:'transparent', borderWidth:2, borderDash:[3,2], tension:.3, pointRadius:2, pointBackgroundColor:SERIES_COLORS.precoMercado, fill:false, yAxisID:'y1'}] : []),
+        ...(mostrarRsHlPorIndicador ? [{label:'R$/HL', data:rsHlKpiData, borderColor:k.cor, backgroundColor:'transparent', borderWidth:2, borderDash:[1,2], tension:.3, pointRadius:2, pointBackgroundColor:k.cor, fill:false, yAxisID:'y2'}] : [])
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:7, font:{size:9}, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtBRLc(ctx.raw)}} },
+        plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:7, font:{size:9}, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='y2' ? (ctx.dataset.label+': '+fmtBRLc(ctx.raw)+'/hL') : (ctx.dataset.label+': '+fmtBRLc(ctx.raw))}} },
         scales:{
           y:{ ticks:{callback:v=>fmtBRL(v), color:TICK_COLOR, font:{size:9}}, grid:{color:GRID_COLOR} },
           y1:{ display:mostrarPrecoMercado, position:'right', ticks:{callback:v=>fmtBRLc(v), color:SERIES_COLORS.precoMercado, font:{size:8}}, grid:{display:false} },
+          y2:{ display:mostrarRsHlPorIndicador, position:'right', ticks:{callback:v=>fmtBRLc(v), color:k.cor, font:{size:8}}, grid:{display:false} },
           x:{ticks:{color:TICK_COLOR, font:{size:9}}, grid:{display:false}} } }
     });
   });
