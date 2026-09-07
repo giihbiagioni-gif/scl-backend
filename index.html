@@ -430,6 +430,14 @@ function sumFiltered(arr){
   return arr.reduce((s,v,i)=> (selectedMonthIdx==="all" || selectedMonthIdx===i) ? s + (v||0) : s, 0);
 }
 
+// WQI só é válido de verdade pra Quebra PA — e só conta se tiver algum valor real no array
+// (um array cheio de null, deixado por um upload antigo, não conta como "ter WQI")
+function temWqi(k){
+  const temValor = (k.wqi_meta_mensal||[]).some(v=>v!=null) || (k.wqi_real_mensal||[]).some(v=>v!=null);
+  if(!temValor) return false;
+  return k.isGroup || k.cod===22007;
+}
+
 // média (não soma) — usada para as taxas R$/hL, que são um índice e não um valor acumulável
 function avgFiltered(arr){
   let sum=0, count=0;
@@ -527,7 +535,7 @@ function renderSummary(){
   const fgliVar = (fgliHasMeta && fgliMetaSum) ? ((fgliRealSum-fgliMetaSum)/fgliMetaSum*100) : null;
 
   // WQI total (aba WQI) — só Quebra PA tem esse dado hoje; usa média (é um índice, não soma)
-  const kpisWithWqi = activeKpis().filter(k=>k.wqi_meta_mensal!=null);
+  const kpisWithWqi = activeKpis().filter(temWqi);
   let wqiMeta=null, wqiReal=null, wqiVar=null;
   if(kpisWithWqi.length>0){
     wqiMeta = kpisWithWqi.reduce((s,k)=>s+avgFiltered(k.wqi_meta_mensal),0) / kpisWithWqi.length;
@@ -631,7 +639,7 @@ const _groupVirtualCodMap = {};
 function buildGroupVirtualKpi(group, kids){
   if(_groupVirtualCodMap[group.nome]==null) _groupVirtualCodMap[group.nome] = _groupVirtualCodSeq--;
   const anyGatilho = kids.some(k=>k.gatilho!=null);
-  const kidWithWqi = kids.find(k=>k.wqi_meta_mensal!=null);
+  const kidWithWqi = kids.find(temWqi);
   return {
     cod: _groupVirtualCodMap[group.nome],
     isGroup: true,
@@ -714,7 +722,7 @@ function renderTree(){
     return !NO_FGLI_CODES.includes(k.cod);
   }
   function detailPanel(k){
-    const hasWqi = k.wqi_meta_mensal != null && (k.isGroup || k.cod===22007);
+    const hasWqi = temWqi(k);
     const hasFgli = hasFgliData(k);
     return `
     <div class="flex flex-col gap-1.5 fade-in">
@@ -728,7 +736,7 @@ function renderTree(){
   function detailToggle(k){
     const open = expandedDetail.has(k.cod);
     const hasFgli = hasFgliData(k);
-    const hasWqi = k.wqi_meta_mensal != null && (k.isGroup || k.cod===22007);
+    const hasWqi = temWqi(k);
     const label = hasWqi ? 'Detalhar R$ / FGLI / WQI' : (hasFgli ? 'Detalhar R$ / FGLI' : 'Detalhar R$');
     return `
     <button data-detail="${k.cod}" class="mt-1.5 w-full flex items-center justify-between text-[9px] font-semibold ${open?'text-blue-400':'text-slate-500 hover:text-slate-300'} transition pt-1.5 border-t border-slate-800">
@@ -1175,7 +1183,7 @@ function renderCharts(){
   renderKpiPerfCharts(kpis, monthsLbl, idxRange);
 
   // WQI CHART — hoje só a Quebra PA tem esse dado; média entre os KPIs selecionados que têm WQI
-  const kpisComWqi = kpis.filter(k=>k.wqi_meta_mensal!=null);
+  const kpisComWqi = kpis.filter(temWqi);
   if(kpisComWqi.length===0){
     document.getElementById('wqiChart').parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-500 text-center px-4">Nenhum KPI selecionado tem dado de WQI (hoje só a Quebra PA tem esse indicador).</div>';
   } else {
