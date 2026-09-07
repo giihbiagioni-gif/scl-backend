@@ -704,7 +704,10 @@ function buildGroupVirtualKpi(group, kids){
     fgli_real_mensal: sumArraysOrNull(kids.map(k=>k.fgli_real_mensal)),
     wqi_meta_mensal: kidWithWqi ? kidWithWqi.wqi_meta_mensal : null,
     wqi_real_mensal: kidWithWqi ? kidWithWqi.wqi_real_mensal : null,
-    real_2025_mensal: sumArraysOrNull(kids.map(k=>k.real_2025_mensal))
+    wqi_real_2025_mensal: kidWithWqi ? kidWithWqi.wqi_real_2025_mensal : null,
+    real_2025_mensal: sumArraysOrNull(kids.map(k=>k.real_2025_mensal)),
+    fgli_real_2025_mensal: sumArraysOrNull(kids.map(k=>k.fgli_real_2025_mensal)),
+    hl_real_2025_mensal: avgArraysOrNull(kids.map(k=>k.hl_real_2025_mensal))
   };
 }
 
