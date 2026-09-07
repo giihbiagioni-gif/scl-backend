@@ -1545,29 +1545,42 @@ function exportEditableCSV(){
 
 // parser simples de CSV: não lida com vírgulas dentro de aspas de forma sofisticada,
 // mas cobre bem o caso do nosso arquivo (só o nome do KPI vem entre aspas)
-function parseCsvLine(line){
+function parseCsvLine(line, delim){
+  delim = delim || ',';
   const out = [];
   let cur = '', dentroAspas = false;
   for(let i=0;i<line.length;i++){
     const c = line[i];
     if(c === '"'){ dentroAspas = !dentroAspas; continue; }
-    if(c === ',' && !dentroAspas){ out.push(cur); cur=''; continue; }
+    if(c === delim && !dentroAspas){ out.push(cur); cur=''; continue; }
     cur += c;
   }
   out.push(cur);
   return out;
 }
 
+// descobre se o CSV usa vírgula ou ponto e vírgula (Excel em PT-BR costuma salvar com ; )
+function detectarDelimitadorCSV(headerLine){
+  const pontoVirgula = (headerLine.match(/;/g)||[]).length;
+  const virgula = (headerLine.match(/,/g)||[]).length;
+  return pontoVirgula > virgula ? ';' : ',';
+}
+
 function numOuNull(v){
   if(v===undefined || v===null || String(v).trim()==='') return null;
-  const n = Number(v);
+  let s = String(v).trim();
+  // aceita número no formato brasileiro (1.234,56 ou 1234,56), comum quando o arquivo passa pelo Excel em PT-BR
+  if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
+  else if(s.includes(',') && !s.includes('.')) s = s.replace(',', '.');
+  const n = Number(s);
   return isNaN(n) ? null : n;
 }
 
 // lê o CSV editável e devolve {cod: {meta_mensal:[8], real_mensal:[8], ..., gatilho}}
 function parseEditableCSV(texto){
-  const linhas = texto.replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
-  const header = parseCsvLine(linhas[0]).map(h=>h.trim().toLowerCase());
+  const linhas = texto.replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
+  const delim = detectarDelimitadorCSV(linhas[0]);
+  const header = parseCsvLine(linhas[0], delim).map(h=>h.trim().toLowerCase());
   const idx = campo => header.indexOf(campo);
 
   const iCod = idx('kpi_cod'), iMesIdx = idx('mes_idx'), iMeta = idx('meta_rs'), iReal = idx('real_rs'),
@@ -1581,7 +1594,7 @@ function parseEditableCSV(texto){
 
   const porCod = {};
   linhas.slice(1).forEach(linha=>{
-    const cols = parseCsvLine(linha);
+    const cols = parseCsvLine(linha, delim);
     const cod = numOuNull(cols[iCod]);
     const mesIdx = numOuNull(cols[iMesIdx]);
     if(cod==null || mesIdx==null || mesIdx<1 || mesIdx>8) return;
