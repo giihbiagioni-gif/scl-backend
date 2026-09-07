@@ -155,7 +155,10 @@
       <div class="h-72"><canvas id="barChart"></canvas></div>
     </div>
     <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
-      <h3 class="text-sm font-bold text-slate-200 mb-1">Volume Escoado (hL) — Meta vs Real</h3>
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-bold text-slate-200">Volume Escoado (hL) — Meta vs Real</h3>
+        <div id="volumeYtdBadge"></div>
+      </div>
       <p class="text-xs text-slate-500 mb-3">Evolução mensal do volume total</p>
       <div class="h-72"><canvas id="volumeChart"></canvas></div>
     </div>
@@ -1262,6 +1265,23 @@ function renderCharts(){
   const volReal = idxRange.map(i=>DATA.volume.real[i]);
   const volReal2025 = idxRange.map(i=>DATA.volume.real2025 ? DATA.volume.real2025[i] : null);
   const temVol2025 = volReal2025.some(v=>v!=null);
+
+  // comparativo YTD 25→26 do volume, no mesmo período filtrado
+  const badgeEl = document.getElementById('volumeYtdBadge');
+  if(badgeEl){
+    if(temVol2025){
+      const real2026Sum = sumFiltered(DATA.volume.real);
+      const real2025Sum = sumFiltered(DATA.volume.real2025);
+      const volVarPct = real2025Sum ? ((real2026Sum-real2025Sum)/real2025Sum*100) : null;
+      if(volVarPct!=null){
+        const s = statusColor(-volVarPct); // volume maior que 2025 é bom (inverso das métricas de perda)
+        badgeEl.innerHTML = `<span class="flex items-center gap-1 font-bold px-2 py-1 rounded-full text-[10px] ${s.text}" style="background:${s.chip}" title="Comparativo com o mesmo período de 2025">
+          <span class="w-1.5 h-1.5 rounded-full ${s.bg}"></span>YTD 25→26 ${fmtPct(volVarPct)}
+        </span>`;
+      } else badgeEl.innerHTML = '';
+    } else badgeEl.innerHTML = '';
+  }
+
   charts.volume = new Chart(document.getElementById('volumeChart'), {
     type:'bar',
     data:{ labels: monthsLbl, datasets:[
