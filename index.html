@@ -181,6 +181,18 @@
     </div>
   </section>
 
+  <!-- ==================== CHARTS ROW 4 — R$/HL SCL Total 2026 x 2025 ==================== -->
+  <section class="grid grid-cols-1 gap-6">
+    <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
+      <h3 class="text-sm font-bold text-slate-200 mb-1">R$/HL — Prejuízo Total SCL vs Volume Vendido: 2026 x 2025</h3>
+      <p class="text-xs text-slate-500 mb-3">Prejuízo total (soma dos KPIs selecionados) dividido pelo volume vendido (hecto), mês a mês</p>
+      <div class="h-72 relative">
+        <canvas id="rsHlSclChart"></canvas>
+        <div id="rsHlSclChartEmpty" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-500 text-center px-4">Ainda não tem dado de volume/2025 suficiente pra montar esse comparativo.</div>
+      </div>
+    </div>
+  </section>
+
   <!-- ==================== DESEMPENHO POR KPI (MÊS A MÊS, 2025 x 2026) ==================== -->
   <section class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
     <h3 class="text-sm font-bold text-slate-200 mb-1 flex items-center gap-2">
@@ -1205,7 +1217,7 @@ const SERIES_COLORS = {
 
 function renderCharts(){
   if (typeof Chart === 'undefined') {
-    ['lineChart','pieChart','barChart','volumeChart','wqiChart','fgliChart'].forEach(id=>{
+    ['lineChart','pieChart','barChart','volumeChart','wqiChart','fgliChart','rsHlSclChart'].forEach(id=>{
       const canvas = document.getElementById(id);
       if(canvas && canvas.parentElement){
         canvas.parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-500">Não foi possível carregar a biblioteca de gráficos (Chart.js). Os demais dados do dashboard continuam disponíveis.</div>';
@@ -1335,6 +1347,36 @@ function renderCharts(){
       plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' hL'}} },
       scales:{ y:{ticks:{callback:v=>fmtNum(v), color:TICK_COLOR}, grid:{color:GRID_COLOR}}, x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
   });
+
+  // R$/HL SCL TOTAL CHART — prejuízo total (soma dos KPIs selecionados) dividido pelo volume vendido, 2026 x 2025
+  const perda2026PorMes = idxRange.map(i => kpis.reduce((s,k)=>s+(k.real_mensal[i]||0),0));
+  const perda2025PorMes = idxRange.map(i => kpis.reduce((s,k)=>s+((k.real_2025_mensal && k.real_2025_mensal[i]!=null)?k.real_2025_mensal[i]:0),0));
+  const volume2026PorMes = idxRange.map(i => DATA.volume.real[i]);
+  const volume2025PorMes = idxRange.map(i => DATA.volume.real2025 ? DATA.volume.real2025[i] : null);
+
+  const rsHlScl2026 = idxRange.map((_,pos) => volume2026PorMes[pos] ? (perda2026PorMes[pos]/volume2026PorMes[pos]) : null);
+  const rsHlScl2025 = idxRange.map((_,pos) => (volume2025PorMes[pos]!=null && volume2025PorMes[pos]!==0) ? (perda2025PorMes[pos]/volume2025PorMes[pos]) : null);
+  const temRsHlScl2025 = rsHlScl2025.some(v=>v!=null);
+
+  const rsHlSclCanvas = document.getElementById('rsHlSclChart');
+  const rsHlSclEmptyMsg = document.getElementById('rsHlSclChartEmpty');
+  if(!temRsHlScl2025){
+    if(rsHlSclCanvas) rsHlSclCanvas.classList.add('hidden');
+    if(rsHlSclEmptyMsg) rsHlSclEmptyMsg.classList.remove('hidden');
+  } else {
+    if(rsHlSclCanvas) rsHlSclCanvas.classList.remove('hidden');
+    if(rsHlSclEmptyMsg) rsHlSclEmptyMsg.classList.add('hidden');
+    charts.rsHlScl = new Chart(rsHlSclCanvas, {
+      type:'line',
+      data:{ labels: monthsLbl, datasets:[
+        {label:'R$/HL 2026', data:rsHlScl2026, borderColor:SERIES_COLORS.ano2026, backgroundColor:SERIES_COLORS.ano2026+'2a', tension:.3, pointRadius:4, fill:true, pointBackgroundColor:SERIES_COLORS.ano2026},
+        {label:'R$/HL 2025', data:rsHlScl2025, borderColor:SERIES_COLORS.ano2025, backgroundColor:'transparent', borderWidth:2.5, borderDash:[6,3], tension:.3, pointRadius:3, pointBackgroundColor:SERIES_COLORS.ano2025, fill:false}
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'bottom', labels:{usePointStyle:true, boxWidth:8, color:LEGEND_COLOR}}, tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtBRLc(ctx.raw)+'/hL'}} },
+        scales:{ y:{ticks:{callback:v=>fmtBRLc(v), color:TICK_COLOR}, grid:{color:GRID_COLOR}}, x:{ticks:{color:TICK_COLOR}, grid:{display:false}} } }
+    });
+  }
 }
 
 // um gráfico por KPI: Meta 2026 x Real 2026 x Real 2025, mês a mês
