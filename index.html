@@ -593,6 +593,8 @@ function renderSummary(){
   const volMeta = sumFiltered(DATA.volume.meta);
   const volReal = sumFiltered(DATA.volume.real);
   const volVar = volMeta ? ((volReal-volMeta)/volMeta*100) : 0;
+  const volReal2025Sum = sumFiltered(DATA.volume.real2025 || []);
+  const volYtdVar = volReal2025Sum ? ((volReal-volReal2025Sum)/volReal2025Sum*100) : null;
 
   const custoPorHl = volReal ? (totalReal/volReal) : 0;
 
@@ -624,7 +626,7 @@ function renderSummary(){
   const cards = [
     {label:"PERDA TOTAL REAL", value:fmtBRL(totalReal), sub:`vs meta ${fmtBRL(totalMeta)}`, varv:varTotal, ic:"cash", grad:"from-blue-600 to-blue-900", invert:true, extra: varVsAnoAnterior},
     {label:"VARIAÇÃO vs META", value:(varTotal>=0?"+":"")+varTotal.toFixed(1).replace('.',',')+"%", sub:varTotal<=0?"Dentro da meta":"Acima da meta", varv:varTotal, ic:"target", grad:"from-violet-600 to-violet-900", invert:true, extra: varVsAnoAnterior},
-    {label:"VOLUME REAL (hL)", value:fmtNum(volReal), sub:`meta ${fmtNum(volMeta)} hL`, varv:volVar, ic:"drop", grad:"from-sky-600 to-sky-900", invert:false},
+    {label:"VOLUME REAL (hL)", value:fmtNum(volReal), sub:`meta ${fmtNum(volMeta)} hL`, varv:volVar, ic:"drop", grad:"from-sky-600 to-sky-900", invert:false, extra: volYtdVar, extraInvert: true},
     {label:"CUSTO POR hL", value:custoPorHl.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:2}), sub:"R$ perda / hL escoado", varv:0, ic:"tree", grad:"from-emerald-600 to-emerald-900", hideArrow:true},
     {label:"KPIs CRÍTICOS", value:critCount+" de "+activeKpis().length, sub:"acima de +15% da meta", varv:critCount>0?1:-1, ic:"broken", grad:"from-amber-600 to-orange-800", invert:true},
     {label:"PERÍODO ANALISADO", value: rotuloPeriodo(), sub:"Referência 2026", varv:0, ic:"clipboard", grad:"from-slate-700 to-slate-900", hideArrow:true},
@@ -649,7 +651,7 @@ function renderSummary(){
       ${c.extra!=null ? `
       <div class="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-800">
         <span class="text-[10px] text-pink-300 flex items-center gap-1">${icon('tree','w-3 h-3')} vs 2025</span>
-        <span class="text-[11px] font-semibold ${c.extra<=0?'text-emerald-400':'text-red-400'}">${fmtPct(c.extra)}</span>
+        <span class="text-[11px] font-semibold ${(c.extraInvert ? c.extra>=0 : c.extra<=0)?'text-emerald-400':'text-red-400'}">${fmtPct(c.extra)}</span>
       </div>` : ''}
     </div>
   `).join('');
