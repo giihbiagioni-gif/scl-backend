@@ -2322,10 +2322,30 @@ function renderRecordsView(type){
       const id = parseInt(btn.dataset.delRecord);
       const t = btn.dataset.delType;
       pedirConfirmacaoExclusao(async ()=>{
+        const registroExcluido = t==='anomalias' ? records[t].find(r=>r.id===id) : null;
         records[t] = records[t].filter(r=>r.id!==id);
         renderRecordsView(t);
         renderTabBar();
         await deleteRecordFromStorage(t, id);
+
+        // se for um relato de anomalia, pergunta se os planos de ação ligados a ele também devem ser excluídos
+        if(t==='anomalias' && registroExcluido){
+          const planosLigados = records.planos.filter(p => p.id===registroExcluido.planoRef || p.anomaliaRef===id);
+          if(planosLigados.length > 0){
+            const excluirTambem = confirm(
+              `Esse relato tem ${planosLigados.length} plano(s) de ação ligado(s) a ele.\n\n` +
+              `Deseja excluir ${planosLigados.length>1 ? 'esses planos' : 'esse plano'} também?`
+            );
+            if(excluirTambem){
+              for(const p of planosLigados){
+                records.planos = records.planos.filter(x=>x.id!==p.id);
+                await deleteRecordFromStorage('planos', p.id);
+              }
+              renderRecordsView('planos');
+              renderTabBar();
+            }
+          }
+        }
       });
     });
   });
