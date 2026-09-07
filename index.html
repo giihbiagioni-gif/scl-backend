@@ -2387,6 +2387,15 @@ function renderRecordsView(type){
           rec.img = img;
           renderRecordsView(type);
           await addRecordToStorage(type, rec);
+
+          // se esse registro veio de um plano de ação (planoRef), leva a evidência pro plano também
+          if(type!=='planos' && rec.planoRef){
+            const plano = records.planos.find(p=>p.id===rec.planoRef);
+            if(plano){
+              plano.img = img;
+              await addRecordToStorage('planos', plano);
+            }
+          }
         }catch(err){ console.error(err); showUploadStatus('Não consegui processar essa imagem.', false); }
       };
       input.click();
