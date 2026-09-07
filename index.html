@@ -1518,7 +1518,7 @@ function exportCSV(){
    volta pelo botão "Atualizar CSV" atualiza o site inteiro.
    ============================================================ */
 
-const CSV_EDITAVEL_HEADER = ['kpi_cod','kpi_nome','mes_idx','mes','meta_rs','real_rs','fgli_meta_hl','fgli_real_hl','rs_por_hl_meta','rs_por_hl_real','wqi_meta','wqi_real','gatilho_rs'];
+const CSV_EDITAVEL_HEADER = ['kpi_cod','kpi_nome','mes_idx','mes','meta_rs','real_rs','real_2025_rs','fgli_meta_hl','fgli_real_hl','rs_por_hl_meta','rs_por_hl_real','wqi_meta','wqi_real','gatilho_rs'];
 
 function csvNum(v){ return (v===null || v===undefined || v==='') ? '' : v; }
 
@@ -1528,7 +1528,7 @@ function exportEditableCSV(){
     DATA.months.forEach((mes,i)=>{
       linhas.push([
         k.cod, `"${k.nome}"`, i+1, mes,
-        csvNum(k.meta_mensal?.[i]), csvNum(k.real_mensal?.[i]),
+        csvNum(k.meta_mensal?.[i]), csvNum(k.real_mensal?.[i]), csvNum(k.real_2025_mensal?.[i]),
         csvNum(k.fgli_meta_mensal?.[i]), csvNum(k.fgli_real_mensal?.[i]),
         csvNum(k.hl_meta_mensal?.[i]), csvNum(k.hl_real_mensal?.[i]),
         csvNum(k.wqi_meta_mensal?.[i]), csvNum(k.wqi_real_mensal?.[i]),
@@ -1583,7 +1583,7 @@ function parseEditableCSV(texto){
   const header = parseCsvLine(linhas[0], delim).map(h=>h.trim().toLowerCase());
   const idx = campo => header.indexOf(campo);
 
-  const iCod = idx('kpi_cod'), iMesIdx = idx('mes_idx'), iMeta = idx('meta_rs'), iReal = idx('real_rs'),
+  const iCod = idx('kpi_cod'), iMesIdx = idx('mes_idx'), iMeta = idx('meta_rs'), iReal = idx('real_rs'), iReal2025 = idx('real_2025_rs'),
         iFgliMeta = idx('fgli_meta_hl'), iFgliReal = idx('fgli_real_hl'),
         iHlMeta = idx('rs_por_hl_meta'), iHlReal = idx('rs_por_hl_real'),
         iWqiMeta = idx('wqi_meta'), iWqiReal = idx('wqi_real'), iGatilho = idx('gatilho_rs');
@@ -1600,7 +1600,7 @@ function parseEditableCSV(texto){
     if(cod==null || mesIdx==null || mesIdx<1 || mesIdx>8) return;
     if(!porCod[cod]){
       porCod[cod] = {
-        meta_mensal: Array(8).fill(null), real_mensal: Array(8).fill(null),
+        meta_mensal: Array(8).fill(null), real_mensal: Array(8).fill(null), real_2025_mensal: Array(8).fill(null),
         fgli_meta_mensal: Array(8).fill(null), fgli_real_mensal: Array(8).fill(null),
         hl_meta_mensal: Array(8).fill(null), hl_real_mensal: Array(8).fill(null),
         wqi_meta_mensal: Array(8).fill(null), wqi_real_mensal: Array(8).fill(null),
@@ -1611,6 +1611,7 @@ function parseEditableCSV(texto){
     const k = porCod[cod];
     k.meta_mensal[i] = numOuNull(cols[iMeta]);
     k.real_mensal[i] = numOuNull(cols[iReal]);
+    k.real_2025_mensal[i] = numOuNull(cols[iReal2025]);
     k.fgli_meta_mensal[i] = numOuNull(cols[iFgliMeta]);
     k.fgli_real_mensal[i] = numOuNull(cols[iFgliReal]);
     k.hl_meta_mensal[i] = numOuNull(cols[iHlMeta]);
