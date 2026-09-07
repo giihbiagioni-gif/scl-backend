@@ -166,7 +166,10 @@
     <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
       <h3 class="text-sm font-bold text-slate-200 mb-1">Desempenho WQI — Quebra PA</h3>
       <p class="text-xs text-slate-500 mb-3">Meta vs Real, mês a mês</p>
-      <div class="h-72"><canvas id="wqiChart"></canvas></div>
+      <div class="h-72 relative">
+        <canvas id="wqiChart"></canvas>
+        <div id="wqiChartEmpty" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-500 text-center px-4">Nenhum KPI selecionado tem dado de WQI (hoje só a Quebra PA tem esse indicador).</div>
+      </div>
     </div>
     <div class="bg-[#111827] rounded-2xl shadow-sm border border-slate-800 p-5">
       <h3 class="text-sm font-bold text-slate-200 mb-1">Desempenho FGLI (hL)</h3>
@@ -1255,12 +1258,17 @@ function renderCharts(){
 
   // WQI CHART — hoje só a Quebra PA tem esse dado; média entre os KPIs selecionados que têm WQI
   const kpisComWqi = kpis.filter(temWqi);
+  const wqiCanvas = document.getElementById('wqiChart');
+  const wqiEmptyMsg = document.getElementById('wqiChartEmpty');
   if(kpisComWqi.length===0){
-    document.getElementById('wqiChart').parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-xs text-slate-500 text-center px-4">Nenhum KPI selecionado tem dado de WQI (hoje só a Quebra PA tem esse indicador).</div>';
+    if(wqiCanvas) wqiCanvas.classList.add('hidden');
+    if(wqiEmptyMsg) wqiEmptyMsg.classList.remove('hidden');
   } else {
+    if(wqiCanvas) wqiCanvas.classList.remove('hidden');
+    if(wqiEmptyMsg) wqiEmptyMsg.classList.add('hidden');
     const wqiMetaByMonth = idxRange.map(i => kpisComWqi.reduce((s,k)=>s+(k.wqi_meta_mensal[i]!=null?k.wqi_meta_mensal[i]:0),0)/kpisComWqi.length);
     const wqiRealByMonth = idxRange.map(i => kpisComWqi.reduce((s,k)=>s+(k.wqi_real_mensal[i]!=null?k.wqi_real_mensal[i]:0),0)/kpisComWqi.length);
-    charts.wqi = new Chart(document.getElementById('wqiChart'), {
+    charts.wqi = new Chart(wqiCanvas, {
       type:'line',
       data:{ labels: monthsLbl, datasets:[
         {label:'Meta WQI', data:wqiMetaByMonth, borderColor:SERIES_COLORS.meta, backgroundColor:SERIES_COLORS.meta+'22', borderDash:[5,4], tension:.3, pointRadius:4, fill:false},
