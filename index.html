@@ -233,8 +233,6 @@
             <th class="py-2 pr-3 font-semibold text-right">Real (R$)</th>
             <th class="py-2 pr-3 font-semibold text-right">Var. %</th>
             <th class="py-2 pr-3 font-semibold text-center">Status</th>
-            <th class="py-2 pr-3 font-semibold text-center">Anomalia</th>
-            <th class="py-2 pr-3 font-semibold">Justificativa do Estouro</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -1479,30 +1477,7 @@ function renderTable(){
         s = {bg:"bg-slate-600", text:"text-slate-500", label:"Sem dados", chip:"rgba(100,116,139,.15)"};
       }
 
-      // estourou o gatilho do mês? (precisa de relato de anomalia)
       const mes = DATA.months[i];
-      const estourouGatilho = k.gatilho!=null && real!=null && real > k.gatilho;
-      const anomaliaRec = records.anomalias.find(r=>r.kpiCod===k.cod && r.mes===mes);
-
-      let anomaliaCell;
-      if(!estourouGatilho){
-        anomaliaCell = `<span class="text-slate-600 text-[10px]">—</span>`;
-      } else if(anomaliaRec && anomaliaRec.img){
-        anomaliaCell = `
-          <button data-tbl-view-img="${anomaliaRec.id}" class="inline-flex items-center gap-1">
-            <img src="${anomaliaRec.img}" class="w-7 h-7 object-cover rounded-md border border-emerald-500/50 hover:border-emerald-400 transition"/>
-          </button>`;
-      } else {
-        anomaliaCell = `
-          <div class="flex items-center justify-center gap-1.5">
-            <span class="text-[9px] font-bold text-red-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Necessário
-            </span>
-            <button data-tbl-attach="${k.cod}:${mes}" title="Anexar foto" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded p-1 transition">
-              ${icon('broken','w-3 h-3')}
-            </button>
-          </div>`;
-      }
 
       rows.push(`
         <tr class="border-b border-slate-800 hover:bg-slate-800/40">
@@ -1518,68 +1493,10 @@ function renderTable(){
               <span class="w-1.5 h-1.5 rounded-full ${s.bg}"></span>${s.label}
             </span>
           </td>
-          <td class="py-2 pr-3 text-center">${anomaliaCell}</td>
-          <td class="py-2 pr-3">
-            <input type="text" data-tbl-just="${k.cod}:${mes}" value="${(justificativas[`${k.cod}:${mes}`]||'').replace(/"/g,'&quot;')}" placeholder="${estourouGatilho ? 'Descreva o motivo do estouro...' : ''}"
-              class="w-full min-w-[180px] bg-[#0b1220] border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600" />
-          </td>
         </tr>`);
     });
   });
   tbody.innerHTML = rows.join('');
-
-  tbody.querySelectorAll('[data-tbl-view-img]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const rec = records.anomalias.find(r=>r.id===parseInt(btn.dataset.tblViewImg));
-      if(rec && rec.img) openImageModal(rec.img);
-    });
-  });
-
-  tbody.querySelectorAll('[data-tbl-just]').forEach(input=>{
-    input.addEventListener('input', ()=>{
-      const key = input.dataset.tblJust;
-      if(input.value.trim()===''){ delete justificativas[key]; }
-      else { justificativas[key] = input.value; }
-      // salva a cada tecla (com pequeno atraso) — não depende de tirar o foco do campo
-      clearTimeout(input._justSaveTimer);
-      input._justSaveTimer = setTimeout(()=>{
-        saveJustificativasToStorage();
-        input.classList.add('ring-1','ring-emerald-500');
-        setTimeout(()=>input.classList.remove('ring-1','ring-emerald-500'), 500);
-      }, 500);
-    });
-    // garante que, se o campo perder o foco, o valor mais recente também é salvo na hora
-    input.addEventListener('blur', ()=>{
-      clearTimeout(input._justSaveTimer);
-      saveJustificativasToStorage();
-    });
-  });
-
-  tbody.querySelectorAll('[data-tbl-attach]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const [kpiCodStr, mes] = btn.dataset.tblAttach.split(':');
-      const kpiCod = parseInt(kpiCodStr);
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async ()=>{
-        const file = input.files && input.files[0];
-        if(!file) return;
-        try{
-          const img = await compressImage(file);
-          const rec = { id: nextRecordId++, kpiCod, mes, desc:'', resp:'', data:'', status:null, img };
-          records.anomalias.push(rec);
-          await addRecordToStorage('anomalias', rec);
-          renderTable();
-          renderTabBar();
-        }catch(err){
-          console.error(err);
-          showUploadStatus('Não consegui processar essa imagem.', false);
-        }
-      };
-      input.click();
-    });
-  });
 }
 
 /* ============ MONTH FILTER (múltipla seleção) ============ */
