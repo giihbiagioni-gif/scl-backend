@@ -2806,6 +2806,20 @@ function anomaliaFormEdit(r){
       ${campoTexto('Data de Conclusão','dataConclusao',r.dataConclusao,'date')}
     </div>
 
+    <div>
+      <p class="text-[10px] font-semibold text-slate-500 mb-1">EVIDÊNCIA</p>
+      ${r.img ? `
+      <button data-open-img="${r.id}" class="block w-full max-w-xs">
+        <img src="${r.img}" class="w-full h-40 object-cover rounded-lg border border-slate-700 hover:border-blue-500 transition"/>
+      </button>
+      <button data-record-attach="${r.id}" class="mt-2 max-w-xs text-[11px] font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg py-1.5 px-3 transition">Trocar foto</button>
+      ` : `
+      <button data-record-attach="${r.id}" class="w-full max-w-xs h-28 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-lg text-slate-500 hover:text-blue-400 transition">
+        ${icon('broken','w-6 h-6')}
+        <span class="text-[11px] font-semibold">Anexar evidência</span>
+      </button>`}
+    </div>
+
     <div class="flex items-center gap-2 pt-2">
       <button data-save-edit="${r.id}" data-save-type="anomalias" class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 transition text-white text-xs font-semibold px-4 py-2 rounded-lg">Salvar alterações</button>
       <button data-cancel-edit="${r.id}" data-cancel-type="anomalias" class="text-xs font-medium text-slate-400 hover:text-slate-200 px-3 py-2">Cancelar</button>
