@@ -2339,6 +2339,7 @@ function renderRecordsView(type){
       }
       if(t==='planos'){
         await sincronizarAnomaliaDoPlano(rec);
+        await sincronizarDtoTreinoDoPlano(rec);
       }
 
       renderRecordsView(t);
@@ -3004,7 +3005,7 @@ function wireRecordForm(type){
       renderRecordsView(type);
       renderTabBar();
       await addRecordToStorage(type, rec);
-      if(type==='planos') await sincronizarAnomaliaDoPlano(rec);
+      if(type==='planos'){ await sincronizarAnomaliaDoPlano(rec); await sincronizarDtoTreinoDoPlano(rec); }
     };
 
     if(file){
@@ -3637,6 +3638,30 @@ async function removerRelatoSeComentarioDispensar(plano){
   showUploadStatus(`Comentário indica que o relato não é necessário — relato de anomalia removido automaticamente (plano #${plano.id}).`, true);
 }
 
+// se a descrição do plano falar em DTO ou treinamento/manuseio manual e ainda não existir o registro
+// correspondente na aba de DTOs/Treinamentos ligado a esse plano, cria automaticamente
+async function sincronizarDtoTreinoDoPlano(plano){
+  if(!plano) return;
+  const d = (plano.desc||'').toLowerCase();
+  const ehDto = d.includes('dto');
+  const ehTreino = d.includes('manuseio manual') || d.includes('treinamento');
+  if(!ehDto && !ehTreino) return;
+
+  const destino = ehDto ? 'dtos' : 'treinamentos';
+  if(records[destino].some(r=>r.planoRef===plano.id)) return; // já existe, não duplica
+
+  const novo = {
+    id: nextRecordId++, kpiCod: plano.kpiCod, mes: plano.mes, desc: plano.desc,
+    resp: plano.resp, colaborador: extrairColaborador(plano.desc), planoRef: plano.id,
+    data: plano.data, dataCriacao: plano.dataCriacao, dataConclusao: plano.dataConclusao,
+    status: plano.status, img: null, evidenciaSugerida: false, comentario: plano.comentario || ''
+  };
+  records[destino].push(novo);
+  await addRecordToStorage(destino, novo);
+  if(activeTab===destino) renderRecordsView(destino);
+  renderTabBar();
+}
+
 async function sincronizarAnomaliaDoPlano(plano){
   if(!plano || !(plano.desc||'').toLowerCase().includes('relato de anomalia')) return;
   if(records.anomalias.some(r=>r.planoRef===plano.id)) return; // já existe, não duplica
@@ -4124,6 +4149,7 @@ async function processarPlanosEmLote(file){
       records.planos.push(rec);
       await addRecordToStorage('planos', rec);
       await sincronizarAnomaliaDoPlano(rec);
+      await sincronizarDtoTreinoDoPlano(rec);
     }
 
     renderRecordsView('planos');
