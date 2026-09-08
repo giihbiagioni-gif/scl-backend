@@ -3127,7 +3127,7 @@ function gapaDetail(r){
   <div>
     <p class="text-xs text-slate-500 mb-3">Revenda: <span class="text-slate-300 font-semibold">${r.revenda}</span>${r.resp ? ' · Resp: '+r.resp : ''}</p>
 
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
       <div class="bg-[#111827] rounded-lg p-2.5">
         <p class="text-[9px] text-slate-500 font-semibold">MÊS · META</p>
         <p class="text-sm font-bold text-slate-100">${fmtBRLc(r.mesMeta)}</p>
@@ -3146,6 +3146,17 @@ function gapaDetail(r){
         <p class="text-sm font-bold text-slate-100">${fmtBRLc(r.acumAtual)}</p>
         <p class="text-[10px] font-bold ${varColor(r.acumVar)}">${fmtPct(r.acumVar*100)}</p>
       </div>
+      ${r.anoMeta!=null ? `
+      <div class="bg-[#111827] rounded-lg p-2.5">
+        <p class="text-[9px] text-slate-500 font-semibold">ANO · META</p>
+        <p class="text-sm font-bold text-slate-100">${fmtBRLc(r.anoMeta)}</p>
+      </div>` : ''}
+      ${r.anoAtual!=null ? `
+      <div class="bg-[#111827] rounded-lg p-2.5">
+        <p class="text-[9px] text-slate-500 font-semibold">ANO · ATUAL (ACUMULADO FINAL)</p>
+        <p class="text-sm font-bold text-slate-100">${fmtBRLc(r.anoAtual)}</p>
+        ${r.anoLacuna!=null ? `<p class="text-[10px] font-bold ${varColor(r.anoLacuna)}">${fmtPct(r.anoLacuna*100)}</p>` : ''}
+      </div>` : ''}
       <div class="bg-[#111827] rounded-lg p-2.5">
         <p class="text-[9px] text-slate-500 font-semibold">GOP (ANO)</p>
         <p class="text-sm font-bold text-emerald-400">${(r.gopAno*100).toFixed(1).replace('.',',')}%</p>
