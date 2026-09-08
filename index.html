@@ -3165,6 +3165,11 @@ function gapaDetail(r){
         <p class="text-[9px] text-slate-500 font-semibold">ANO · META</p>
         <p class="text-sm font-bold text-slate-100">${fmtBRLc(r.anoMeta)}</p>
       </div>` : ''}
+      ${r.anoDesafio!=null ? `
+      <div class="bg-[#111827] rounded-lg p-2.5">
+        <p class="text-[9px] text-slate-500 font-semibold">ANO · DESAFIO</p>
+        <p class="text-sm font-bold text-slate-100">${fmtBRLc(r.anoDesafio)}</p>
+      </div>` : ''}
       ${r.anoAtual!=null ? `
       <div class="bg-[#111827] rounded-lg p-2.5">
         <p class="text-[9px] text-slate-500 font-semibold">ANO · ATUAL (ACUMULADO FINAL)</p>
